@@ -4,6 +4,13 @@ Storage is the bottleneck that keeps GPU dollars idle. This lab measures the exa
 
 I am Kumar Nachiketa, and I have been privileged to work in data storage and watch the field transition over the last 20 years: on-prem, cloud, and now AI infrastructure. This lab is the bench where I test ideas and fundamentals — sometimes just out of curiosity, sometimes to establish a pattern worth testing at small scale and applying at any scale.
 
+![AIHomeLab cluster topology — two DGX Spark nodes connected by management LAN and QSFP RoCE fabric](assets/topology.svg)
+
+*Two DGX Spark nodes share a management LAN for control and a direct 200 Gbps QSFP RoCE fabric for high-bandwidth data movement. Each node has a dedicated 4 TB local NVMe.*
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 flowchart TB
@@ -43,7 +50,9 @@ flowchart TB
     linkStyle 3,5 stroke:#F59E0B,stroke-width:3px
 ```
 
-*Two DGX Spark nodes share a management LAN for control and a direct 200 Gbps QSFP RoCE fabric for high-bandwidth data movement. Each node has a dedicated 4 TB local NVMe.*
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o assets/topology.svg -t dark -b transparent`
+
+</details>
 
 ## Headline numbers
 

@@ -8,6 +8,11 @@
 
 Two UMA hosts connected by a single QSFP RoCE fabric. Three cross-host transports share the same physical link — each shows up in a different configuration below.
 
+![Multi-node training storage topology — three transports (NCCL, NFSoRDMA, rsync) sharing one QSFP RoCE fabric between two UMA hosts](topology.svg)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 %%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
 flowchart LR
@@ -32,6 +37,10 @@ flowchart LR
     linkStyle 4,5 stroke:#3FA9F5,stroke-width:2px
 ```
 
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o topology.svg -t dark -b transparent`
+
+</details>
+
 **RoCE = RDMA over Converged Ethernet.** All three transports share the same QSFP physical link — the fabric carries both RDMA verbs (NCCL, NFSoRDMA — kernel-bypass) and standard TCP/IP (rsync, SSH — full kernel network stack) over the same wire. The dramatic bandwidth gap (RDMA ~109 Gb/sec vs TCP-over-QSFP ~517 MB/s on the same link) is the kernel network-stack overhead that RDMA bypasses. Same wire, different layer.
 
 ## Findings
@@ -48,6 +57,11 @@ Most AI infrastructure storage decisions inherit defaults — "use the parallel 
 ## Measured
 
 **Where bytes physically land.** All three configurations run the same workload (250-step SFT on Qwen3-8B with `ckpt_every_steps=100`, producing 3 checkpoints) but place checkpoint data physically very differently.
+
+![Where checkpoint bytes physically land — three configurations: single-node, multinode+rsync, multinode+NFSoRDMA](checkpoint-placement.svg)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 %%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
@@ -88,6 +102,10 @@ flowchart LR
     BLocal1 -.-> CR0
     linkStyle 6,7 stroke:#64748B,stroke-width:1px,stroke-dasharray: 3 5
 ```
+
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o checkpoint-placement.svg -t dark -b transparent`
+
+</details>
 
 The single-node configuration is the cold-cache-penalty baseline (7× hot/cold spread). Multinode + rsync distributes data across both NVMes during training (each rank's per-ckpt memory pressure halves → DCP shard stays cached → 1.06× hot/cold ratio) but adds the post-training sync layer. Multinode + NFSoRDMA centralizes all bytes on host 1's NVMe via the shared mount; host 2's NVMe accumulates zero bytes during checkpointing.
 

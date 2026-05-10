@@ -18,6 +18,11 @@ The script pre-allocates the testfile (one-time), runs all 8 jobs in numeric ord
 
 ## How the kit fits together
 
+![Spark NVMe FIO baseline reproduce kit — orchestrator drives FIO jobs against NVMe testfile, analyzer parses JSON output into a Measured table](kit-structure.svg)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 flowchart LR
@@ -44,6 +49,10 @@ flowchart LR
     ANALYZE -->|markdown| TABLE
     DRIVE -.->|optional, OS-level cross-check| IOSTAT
 ```
+
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o kit-structure.svg -t dark -b transparent`
+
+</details>
 
 The orchestrator drives FIO against the NVMe testfile using parameters from the `.fio` job files; per-job JSON output feeds the analyzer, which prints the Measured table. iostat is an optional OS-level side-channel for cross-validating FIO's reported numbers (see *What the iostat side-channel adds* below).
 

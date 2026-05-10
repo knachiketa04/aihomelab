@@ -8,6 +8,11 @@
 
 Two UMA workstations, asymmetric Lustre service distribution. Host 1 runs the metadata plane (MGS + MDT0000) and the first object target (OST0000); host 2 runs only the second object target (OST0001). Both hosts run Lustre clients. Files are striped 2-way across both OSTs by default — every IO splits 50/50 between local-loopback (cheap) and cross-node-over-RoCE (the architectural cost).
 
+![Lustre cluster topology — MGS/MDT/OST distribution across two UMA hosts with RoCE QSFP cross-connect](topology.svg)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 flowchart TB
@@ -53,6 +58,10 @@ flowchart TB
     FAB -.->|"OSC ↔ OST RPC"| OST0
     FAB -.->|"MDC ↔ MDT RPC"| MGS
 ```
+
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o topology.svg -t dark -b transparent`
+
+</details>
 
 *Each client sees one filesystem namespace at `/mnt/lustre`. A 2-way striped 1 MiB IO from either client splits: stripe-block 0 lands on OST0000, stripe-block 1 on OST0001, alternating per `stripe_size=4 MiB`. From host 1's perspective, half the bytes flow over loopback (`0@lo`, fast) and half over o2ib RoCE to OST0001 (network-leg-bottlenecked). From host 2's perspective, the asymmetry is reversed. The dashed paths are RDMA over the QSFP cross-connect; the solid paths are local. The orange "ZFS pool → ost?.img → ext4 root" boxes are the file-backed-zpool substrate that adds 60–75% overhead vs raw block-device vdevs — the cost of stock-UMA single-NVMe layouts, characterized in the Measured section below.*
 

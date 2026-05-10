@@ -5,6 +5,11 @@ tags: [aihomelab]
 
 ## Topology
 
+![DGX Spark cluster topology — two nodes (spark01, spark02) with management LAN for control and QSFP RoCE fabric for data path](cluster-topology.svg)
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 %%{init: {'theme':'dark'}}%%
 flowchart TB
@@ -54,6 +59,10 @@ flowchart TB
     %% 5,7: data plane (QSFP RoCE, planned) — amber, solid and thicker (high-bandwidth path)
     linkStyle 5,7 stroke:#F59E0B,stroke-width:3px
 ```
+
+To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o cluster-topology.svg -t dark -b transparent`
+
+</details>
 
 *Caption:* Two DGX Spark nodes share a common management LAN for control and a direct QSFP RoCE fabric reserved for high-bandwidth data movement (cross-node training, checkpoint sync). Each node has a dedicated 3.7 TB local NVMe — currently the only storage tier in use; GCS and any network storage will be added later as separate experiments.
 
