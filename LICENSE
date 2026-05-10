@@ -1,0 +1,43 @@
+AIHomeLab — License
+
+Personal Project Disclaimer
+---------------------------
+
+AIHomeLab is the personal project of Kumar Nachiketa. It is not
+affiliated with, sponsored by, or endorsed by any employer, past or
+present. All findings, opinions, and recommendations are personal and do
+not represent any company, team, customer, or product. The lab is run on
+personally-owned hardware in personal time, and the work here should not
+be read as employer guidance, internal practice, or an official position
+of any kind.
+
+License
+-------
+
+All documentation, prose, diagrams, and experiment write-ups in this
+repository are licensed under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0). The full legal text is at:
+
+  https://creativecommons.org/licenses/by/4.0/legalcode
+
+Human-readable summary:
+
+  https://creativecommons.org/licenses/by/4.0/
+
+If and when source code is added to this repository (for example under
+`infra/` or `benchmarks/`), it will be licensed separately under the
+Apache License, Version 2.0, and a `LICENSE-CODE` file will be added at
+that time. Until then, this repository is documentation-only and CC-BY-4.0
+governs all content.
+
+Attribution requirement (summary): if you share or adapt this material,
+you must give appropriate credit, link to the license, and indicate if
+changes were made. You may do so in any reasonable manner, but not in
+any way that suggests the licensor endorses you or your use.
+
+Recommended attribution string:
+
+  AIHomeLab by Kumar Nachiketa, licensed under CC-BY-4.0.
+  Source: https://github.com/knachiketa04/aihomelab
+
+Copyright (c) 2026 Kumar Nachiketa.

@@ -1,0 +1,75 @@
+# Local secrets and credentials
+secrets/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+*credentials*.json
+*credential*.json
+*service-account*.json
+application_default_credentials.json
+
+# Cloud and tool credentials
+.config/gcloud/
+.aws/
+.azure/
+.huggingface/
+.cache/huggingface/token
+.netrc
+
+# Experiment outputs and large/generated artifacts
+results/raw/
+results/**/*.jsonl
+results/**/*.parquet
+results/**/*.arrow
+results/**/*.safetensors
+results/**/*.pt
+results/**/*.pth
+results/**/*.ckpt
+results/**/*.bin
+/checkpoints/
+experiments/**/checkpoints/
+results/**/checkpoints/
+models/
+datasets/
+wandb/
+mlruns/
+
+# Python and notebook noise
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# OS/editor noise
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Internal experiment workspace — entirely private; only `artifacts/` is public
+experiments/
+
+# Agent-private distilled notes (cross-session, cross-tool, local-only)
+.agent-notes/
+
+# Internal workflow — agent infrastructure, editorial taste, operational state
+CLAUDE.md
+.claude/onboarding.md
+.claude/active-experiment.md
+.claude/publication-philosophy.md
+.claude/skills/
+.claude/agents/
+.claude/settings.local.json
+
+# Archived experiment writeups + planning docs — kept locally for reference, not public
+docs/archive/

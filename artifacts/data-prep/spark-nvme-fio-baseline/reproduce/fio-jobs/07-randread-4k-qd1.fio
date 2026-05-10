@@ -1,0 +1,32 @@
+; 07-randread-4k-qd1 — single-thread, queue depth 1, random 4k read
+;
+; Why it matters: latency floor. The p99 here is the per-op time the drive
+; can actually hit at minimum parallelism. Useful for latency-sensitive
+; workloads (metadata-bound serving, single-threaded dataset header
+; reads, many-small-files patterns).
+;
+; Notes for interpretation:
+; - No SLC concern.
+; - No cache concern: single thread, random pattern, very large region
+;   (effectively the whole file). DRAM cache hit rate negligible.
+; - Headline metric is p99 latency in microseconds, not bandwidth.
+; - Per-platform: NUMA + PCIe traversal can add hundreds of microseconds
+;   to the floor. Compare your number against the typical Gen5
+;   direct-attach latency in published specs (commonly <100 µs).
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+
+[randread-4k-qd1]
+rw=randread
+bs=4k
+numjobs=1
+iodepth=1

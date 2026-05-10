@@ -1,0 +1,34 @@
+; 06-randwrite-4k-qd64 — random 4k write, 4 threads, queue depth 64
+;
+; Why it matters: IOPS ceiling for write. Matters for shuffled-write patterns
+; and small-file checkpoint flushes.
+;
+; Notes for interpretation:
+; - At spec ~2.6 M IOPS × 4 KB = ~10 GB/s aggregate. 180 s × 10 GB/s
+;   = 1.8 TB written. Mostly within SLC for a 442 GB cache (random writes
+;   touch the cache differently than sequential — controller may shed
+;   incoming writes at TLC rate sooner). Add write_bw_log to surface
+;   any mid-run drop.
+; - offset_increment=512g per thread. Random within 512 GiB working set.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+end_fsync=1
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+write_bw_log=06-randwrite-4k-qd64
+log_avg_msec=1000
+
+[randwrite-4k-qd64]
+rw=randwrite
+bs=4k
+numjobs=4
+iodepth=64
+offset_increment=512g
+size=512g

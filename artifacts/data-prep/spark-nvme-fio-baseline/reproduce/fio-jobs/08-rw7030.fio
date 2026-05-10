@@ -1,0 +1,37 @@
+; 08-rw7030 — mixed 70% read / 30% write, 1 MB blocks, 8 threads
+;
+; Why it matters: training proxy. AI training workloads interleave dataset
+; reads (forward pass) with checkpoint + log writes. Pure-read and
+; pure-write jobs miss the controller's read/write interleaving overhead.
+;
+; Notes for interpretation:
+; - At expected ~12 GB/s aggregate × 30% writes × 180 s = ~648 GB
+;   written — exceeds 442 GB SLC by 1.5x. Reported write bandwidth is
+;   partially SLC + partially post-SLC TLC; write_bw_log captures the
+;   transition.
+; - offset_increment=256g per thread (8 threads × 256 GiB = 2 TiB).
+;   Avoids both thread-overlap and thread-loop cache amplification on
+;   the read side.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+end_fsync=1
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+write_bw_log=08-rw7030
+log_avg_msec=1000
+
+[mixed-rw7030]
+rw=rw
+rwmixread=70
+bs=1M
+numjobs=8
+iodepth=1
+offset_increment=256g
+size=256g

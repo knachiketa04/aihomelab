@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# AIHomeLab — pre-commit gitleaks scan
+#
+# Blocks commits that introduce secrets, credentials, tokens, or other patterns
+# gitleaks recognizes. The brand-boundary scan is a separate concern and lives
+# in the aihomelab-publication-gate skill — this hook is credentials-only.
+#
+# Bypass (use sparingly, document why in the commit message):
+#   git commit --no-verify
+#
+# Install (one-time per clone):
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks not found on PATH" >&2
+    echo "  install: brew install gitleaks  # macOS" >&2
+    echo "  or skip this commit with: git commit --no-verify" >&2
+    exit 1
+fi
+
+# --staged: scan only what's about to be committed (the diff)
+# --redact: never print the secret value, just the pattern + location
+# --no-banner: cleaner CI/hook output
+if ! gitleaks git --staged --redact --no-banner ./; then
+    echo "" >&2
+    echo "pre-commit: gitleaks blocked the commit. Findings above." >&2
+    echo "  fix: edit the staged file(s), git add, retry the commit." >&2
+    echo "  bypass (only if you understand the finding): git commit --no-verify" >&2
+    exit 1
+fi

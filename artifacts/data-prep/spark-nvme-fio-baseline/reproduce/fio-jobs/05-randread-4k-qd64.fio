@@ -1,0 +1,30 @@
+; 05-randread-4k-qd64 — random 4k read, 4 threads, queue depth 64
+;
+; Why it matters: IOPS ceiling. Matters for many-small-files workloads
+; (dataset shards, metadata lookups, embedding-table reads).
+;
+; Notes for interpretation:
+; - No SLC concern.
+; - Random pattern means cache hits across a 512 GiB per-thread region
+;   are statistically negligible (drive DRAM 4 GB / 512 GiB × QD64 ≈ <1%
+;   re-hit rate at steady state). offset_increment=512g still applies
+;   for clean per-thread isolation.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+
+[randread-4k-qd64]
+rw=randread
+bs=4k
+numjobs=4
+iodepth=64
+offset_increment=512g
+size=512g

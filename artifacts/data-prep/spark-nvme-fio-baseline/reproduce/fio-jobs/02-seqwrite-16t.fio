@@ -1,0 +1,37 @@
+; 02-seqwrite-16t — 16-thread sequential write, 1 MB blocks, direct I/O
+;
+; Why it matters: multi-thread ceiling for write. Compare to spec to
+; quantify the spec → FIO ceiling gap. Also exposes SLC fall-off most
+; sharply because 16 threads × full bw saturates the controller's
+; ingestion rate, filling SLC fast.
+;
+; Notes for interpretation:
+; - At ~11 GB/s × 180 s = ~2 TB written. Crosses 442 GB SLC ~4.5x.
+;   Reported bw heavily averages SLC + post-SLC TLC.
+; - offset_increment=128g splits the testfile into 16 regions of 128 GiB
+;   each. Each thread writes sequentially within its own region (loops
+;   when it reaches end). 16 × 128 GiB = 2 TiB, matches size=.
+; - write_bw_log: plot to see the SLC knee (typically within first 30 s
+;   on consumer Gen5 drives at this aggregate write rate).
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+end_fsync=1
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+write_bw_log=02-seqwrite-16t
+log_avg_msec=1000
+
+[seqwrite-16t]
+rw=write
+bs=1M
+numjobs=16
+iodepth=1
+offset_increment=128g
+size=128g

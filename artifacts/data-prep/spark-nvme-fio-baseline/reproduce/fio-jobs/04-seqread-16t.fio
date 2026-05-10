@@ -1,0 +1,38 @@
+; 04-seqread-16t — 16-thread sequential read, 1 MB blocks, direct I/O
+;
+; Why it matters: multi-thread ceiling for read. Two cache-amplification
+; bugs to avoid here:
+;
+;   1. Thread-overlap: without offset_increment, all threads read the
+;      same byte ranges. Drive serves block X from NAND once, returns
+;      it from DRAM cache to the other 15 threads. FIO counts every
+;      per-thread read as bandwidth → "throughput" exceeds physical
+;      Gen5 link capacity (saw 32 GB/s on a 16 GB/s link in probing).
+;   2. Thread-loop: with offset_increment but small per-thread region,
+;      each thread loops within its own region. After first wrap,
+;      drive DRAM + kernel block-layer read-ahead serve subsequent
+;      reads at memory speed, inflating reported bandwidth (~2x).
+;
+; Mitigation: per-thread region must be larger than runtime × per-thread
+; real bandwidth. At ~700 MB/s per thread × 180 s = ~126 GB needed.
+; offset_increment=128g gives 128 GiB regions. 16 × 128 GiB = 2 TiB,
+; matches size=. Threads barely complete one pass — no wrap.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+
+[seqread-16t]
+rw=read
+bs=1M
+numjobs=16
+iodepth=1
+offset_increment=128g
+size=128g

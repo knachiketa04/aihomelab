@@ -1,0 +1,34 @@
+; 01-seqwrite-1t — single-thread sequential write, 1 MB blocks, direct I/O
+;
+; Why it matters: matches the I/O pattern of single-stream application loaders
+; (e.g. naive checkpoint writers). Single thread can't fill modern Gen5
+; controllers fast enough to dominate SLC behavior — establishes the
+; "what one thread can extract" baseline.
+;
+; Notes for interpretation:
+; - At ~7 GB/s × 180 s = ~1.26 TB written. Exceeds typical SLC caches
+;   on consumer Gen5 NVMe (typical 4 TB consumer drives have several
+;   hundred GB of SLC). Reported bw is a time-average across SLC +
+;   post-SLC TLC fall-off.
+; - write_bw_log emits per-second bandwidth for the curve. Plot the .log
+;   file to see exactly when SLC fills.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+end_fsync=1
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+write_bw_log=01-seqwrite-1t
+log_avg_msec=1000
+
+[seqwrite-1t]
+rw=write
+bs=1M
+numjobs=1
+iodepth=1

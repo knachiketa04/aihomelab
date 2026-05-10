@@ -1,0 +1,27 @@
+; 03-seqread-1t — single-thread sequential read, 1 MB blocks, direct I/O
+;
+; Why it matters: read counterpart to job 01. Single-stream baseline. Shows
+; the per-thread read rate the drive can sustain.
+;
+; Notes for interpretation:
+; - No SLC concern (reads not write-cached).
+; - No thread-overlap cache concern (single thread).
+; - At ~6 GB/s × 180 s = ~1.08 TB read from start of testfile.
+;   2 TiB testfile leaves plenty of headroom; thread won't wrap.
+
+[global]
+ioengine=libaio
+direct=1
+time_based=1
+runtime=180
+ramp_time=10
+group_reporting=1
+directory=/home/sparks/fio-baseline-reproduce
+filename=testfile
+size=2048g
+
+[seqread-1t]
+rw=read
+bs=1M
+numjobs=1
+iodepth=1

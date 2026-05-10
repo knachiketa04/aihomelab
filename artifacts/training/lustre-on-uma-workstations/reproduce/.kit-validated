@@ -1,0 +1,40 @@
+Kit validated end-to-end on UMA workstation cluster on 2026-05-09.
+
+Validation date: 2026-05-09
+Repo HEAD at validation: 2edab22
+Container: n/a (no container in this kit; pure cluster scripts)
+Hardware class: 2× UMA workstations, 121 GiB unified memory, single Gen5 NVMe ~5–7 GB/s class, RoCE QSFP fabric (~109 Gb/sec sustained, ~2 µs RTT), Linux ARM64 kernel 6.x (vendor-signed, Secure-Boot-disabled)
+
+Phases completed:
+- setup-zfs-build.sh (idempotency review against existing build)
+- setup-lustre-build.sh (idempotency review against existing build)
+- setup-secure-boot-trip.md (procedure review; both hosts already had SB disabled from morning's canonical run)
+- verify-modules-loaded.sh (review)
+- setup-lnet.sh (review against existing LNet config)
+- setup-host1-osts.sh (review against existing MGS+MDT0+OST0 state)
+- setup-host2-ost.sh (review against existing OST1 state)
+- setup-runtime-tunables.sh (executed; -P persistence path validated through reboot — runtime knobs auto-applied via MGS config log on next mount)
+- run-single-node-tuning.sh (executed × 2; sustained-state baseline characterized, reframed expected-output.md from burst to sustained)
+- run-cross-node-baseline.sh (executed; reproduces reference numbers within ±15–20% drift)
+- run-distributed-concurrent.sh (executed; aggregate write 1.22 GB/s, aggregate read 9.89 GB/s — both pass thresholds)
+- analyze-fio.py (executed; produces full per-pillar + aggregate comparison table)
+
+Bugs caught + fixed during validation:
+- run-cross-node-baseline.sh: `sudo lctl get_param` over non-TTY ssh + `set -euo pipefail` caused silent script exit. Fixed by dropping sudo (lctl read-only doesn't need it) and adding `|| true` to the pipeline.
+- run-distributed-concurrent.sh: `${EXP_ROOT}` in the harvest ssh command expanded on the control host instead of the remote shell. Fixed by escaping as `\$HOME/lustre-on-uma-reproduce/...` so the remote shell expands it.
+- analyze-fio.py: regex didn't handle fio's lowercase `kB` unit suffix (used for small kilobyte numbers). Fixed by adding case-insensitive matching and lowercase unit table entries.
+- expected-output.md framing bug: original Pillar 1 reference numbers anchored to burst-SLC-aided measurements (~2.2 GB/s, ~11 GB/s). Sustained 180s × 256 GiB working set crosses the SLC cache (~442 GB on the canonical hardware), so honest reference is 0.5–0.8 GB/s sustained writes / 5–7 GB/s cold-cache reads. Reframed expected-output.md to reflect sustained as the headline, with burst noted as informational only.
+- README.md kit gap: no boot-persistence (file-backed zpools don't auto-import after reboot, Lustre mounts don't auto-restore). Added explicit "Post-reboot recovery" section with the manual bring-up sequence.
+- expected-output.md per-client read asymmetry: Pillar 3 reads can drift to 2× per-client asymmetry if two hosts' sequential batteries desync (faster host's read phase overlaps slower host's still-running write phase). Aggregate over full test window remains valid for capacity claims; per-client snapshot can mislead. Documented as caveat.
+
+Kit reproduces artifact-grade qualitative findings within ±15–20% drift on this controlled run:
+- Pillar 1: knob trio + sustained-state framing reproduce (within sustained-NVMe ceiling band)
+- Pillar 2: cross-node single-OST writes 0.39 GB/s (ref 0.49), reads 2.39 GB/s (ref 2.28) — qualitative shape (network-bound, ~6× slower than NFSoRDMA cached reads on identical hardware) reproduces cleanly
+- Pillar 3: distributed concurrent aggregate 1.22 GB/s write (ref 1.35) / 9.89 GB/s read (ref 9.32) — reproduces the headline finding that distributed Lustre's win condition is concurrent multi-client access
+
+Not in scope (deliberately):
+- Realistic AI training workloads (no `--direct=1`, larger ARC, primarycache=all).
+- Multi-rail LNet (blocked by upstream `lnetctl` ARM64 stack-smash bug).
+- Raw-partition zpools (would require destructive root-FS shrink; stock substrate is the kit's audience).
+- ko2iblnd module-param tuning.
+- Boot persistence.

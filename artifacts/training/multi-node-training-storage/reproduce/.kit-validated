@@ -1,0 +1,25 @@
+Kit validated end-to-end on a 2-host cluster on 2026-05-05.
+
+Validation date: 2026-05-05
+Repo HEAD at validation: 37c0936
+Container: nvcr.io/nvidia/nemo-automodel:26.02
+Hardware class: 2× UMA hosts, 121 GiB unified memory each, Gen5 NVMe, QSFP RoCE
+fabric pair (109 Gb/sec sustained, ~2 µs latency).
+
+Phases completed:
+- NFSoRDMA setup (idempotent, server + client side)
+- Single-node baseline training (250 steps, c100)
+- Multinode-rsync training (250 steps, c100, both hosts)
+- sync-after-training (race-free pull-then-push from host1)
+- Multinode-nfsordma training (250 steps, c100, both hosts via shared FS)
+- Cold-restore-nfsordma (TP6 measurement, both hosts)
+- analyze-iostat.sh + analyze-checkpoint-events.sh
+
+Bugs caught + fixed during validation:
+- run-multinode-rsync-host{1,2}.sh and run-multinode-nfsordma-host1.sh: `sudo chmod -R 777`
+  alone insufficient for root-owned ckpt dirs; subsequent rsync as $USER failed mtime
+  updates → exit 23 → script abort. Fix: add `sudo chown -R "$USER:$USER" ${RUN_DIR}/checkpoints`
+  after each training run, before the chmod.
+
+Kit reproduces all artifact-grade qualitative findings within ±15% drift on this
+controlled run.
