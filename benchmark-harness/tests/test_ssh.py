@@ -30,7 +30,7 @@ def _fake_subprocess(monkeypatch, returncode=0, stdout="", stderr=""):
     """Patch subprocess.run to return a deterministic CompletedProcess and capture argv."""
     calls: list[list[str]] = []
 
-    def fake_run(argv, capture_output, text, timeout=None):
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
         calls.append(argv)
         proc = MagicMock()
         proc.returncode = returncode
@@ -87,7 +87,7 @@ def test_run_remote_returns_result_when_check_false(monkeypatch):
 
 
 def test_run_remote_timeout_returns_124_when_check_false(monkeypatch):
-    def fake_run(argv, capture_output, text, timeout=None):
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
         raise subprocess.TimeoutExpired(cmd=argv, timeout=timeout, output=b"", stderr=b"")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -114,7 +114,7 @@ def test_preflight_passes_when_free_exceeds_required(monkeypatch):
     # mkdir succeeds, df returns 3 TiB free.
     seq = iter([("", 0), ("3298534883328\n", 0)])  # 3 TiB
 
-    def fake_run(argv, capture_output, text, timeout=None):
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
         stdout, code = next(seq)
         return MagicMock(returncode=code, stdout=stdout, stderr="")
 
@@ -128,7 +128,7 @@ def test_preflight_passes_when_free_exceeds_required(monkeypatch):
 def test_preflight_fails_when_free_below_required_plus_margin(monkeypatch):
     seq = iter([("", 0), ("2199023255552\n", 0)])  # 2 TiB
 
-    def fake_run(argv, capture_output, text, timeout=None):
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
         stdout, code = next(seq)
         return MagicMock(returncode=code, stdout=stdout, stderr="")
 
@@ -140,7 +140,7 @@ def test_preflight_fails_when_free_below_required_plus_margin(monkeypatch):
 
 
 def test_preflight_fails_when_mkdir_fails(monkeypatch):
-    def fake_run(argv, capture_output, text, timeout=None):
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
         return MagicMock(returncode=1, stdout="", stderr="permission denied\n")
 
     monkeypatch.setattr(subprocess, "run", fake_run)

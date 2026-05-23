@@ -81,6 +81,7 @@ def _run(
     timeout: int | None,
     check: bool,
     dry_run: bool,
+    stdin: str | None = None,
 ) -> RemoteResult:
     if dry_run:
         return RemoteResult(
@@ -94,7 +95,9 @@ def _run(
         )
     t0 = time.monotonic()
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, timeout=timeout, input=stdin
+        )
     except subprocess.TimeoutExpired as exc:
         elapsed = time.monotonic() - t0
         stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
@@ -130,14 +133,21 @@ def run_remote(
     timeout: int | None = None,
     check: bool = True,
     dry_run: bool = False,
+    stdin: str | None = None,
 ) -> RemoteResult:
     """Run a non-sudo command on ``node``.
 
     Returns a RemoteResult. Raises RemoteError on non-zero exit if ``check=True``
     (default). Use ``check=False`` when the caller wants to inspect the result.
+
+    ``stdin`` is piped to the remote command's stdin (useful for pushing
+    rendered fio configs without scp).
     """
     argv = _ssh_argv(node, tty=False) + [command]
-    return _run(node.name, argv, command, timeout=timeout, check=check, dry_run=dry_run)
+    return _run(
+        node.name, argv, command,
+        timeout=timeout, check=check, dry_run=dry_run, stdin=stdin,
+    )
 
 
 def run_remote_sudo(
