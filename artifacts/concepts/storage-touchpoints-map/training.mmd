@@ -1,0 +1,36 @@
+%%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
+flowchart TB
+    classDef storage    fill:#F59E0B,stroke:#B45309,color:#0B1020,stroke-width:1px
+    classDef compute    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef memory     fill:#00C2A8,stroke:#008F7E,color:#0B1020,stroke-width:1px
+    classDef fabric     fill:#38BDF8,stroke:#0284C7,color:#0B1020,stroke-width:1px
+    classDef tier       fill:#0F172A,stroke:#475569,color:#F1F5F9,stroke-width:2px
+
+    REG["<b>Source tier</b><br>weights registry,<br>dataset object store"]:::fabric
+
+    subgraph TIER["<b>Training-fast tier</b> — parallel FS / local NVMe / shared FS"]
+        direction LR
+        DS["dataset shards"]:::storage
+        CKPT["checkpoint store<br>DCP + consolidated"]:::storage
+        EXP["deploy-format export"]:::storage
+    end
+
+    subgraph COMPUTE["<b>Compute memory</b> — UMA / GPU + host RAM"]
+        direction LR
+        MODEL["model weights"]:::memory
+        OPT["optimizer state"]:::memory
+        BATCH["packed batch"]:::memory
+    end
+
+    EVAL["<b>Eval / validation</b><br>checkpoint + eval dataset reads<br>results write"]:::fabric
+
+    REG ==>|"TP1 dataset acquire"| DS
+    REG ==>|"TP3 model acquire"| CKPT
+    DS -->|"TP2 dataset load (memory BW)"| BATCH
+    CKPT -->|"TP4 model load (CPU or NVMe)"| MODEL
+    MODEL --> COMPUTE
+    OPT --> COMPUTE
+    COMPUTE ==>|"TP5 checkpoint save (sustained write)"| CKPT
+    CKPT ==>|"TP6 restore (sequential read)"| COMPUTE
+    CKPT -.->|"TP7 deploy export<br>page cache state determines 6× variance"| EXP
+    CKPT -.->|"checkpoint read"| EVAL

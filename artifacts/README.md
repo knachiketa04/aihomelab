@@ -1,14 +1,15 @@
 # Artifacts
 
-Self-contained experimental artifacts from AIHomeLab — each one a packaged write-up plus a reproducible kit you can run on similar hardware.
+Two kinds of artifacts live here:
 
-Organized by AI pipeline stage, since storage behaves differently in each:
+- **Experimental artifacts** — measurement-driven write-ups, each paired with a reproducible kit you can run on similar hardware. Organized by AI pipeline stage:
+  - **`data-prep/`** — dataset ingest, transformation, tokenization, cache behavior.
+  - **`training/`** — fine-tuning, checkpointing, dataloaders, restart behavior.
+  - **`inference/`** — model loading, serving startup, model cache, runtime behavior.
+- **Concept artifacts** — framing-and-explanation guides written from a storage practitioner's lens, anchored to industry-standard references and to the experimental artifacts above. No reproduce kit; the structural integrity comes from anchoring discipline (every framing either links to a measurement or carries a *descriptive only* tag).
+  - **`concepts/`** — pipeline maps, storage decision frameworks, cross-stage patterns.
 
-- **`data-prep/`** — dataset ingest, transformation, tokenization, cache behavior.
-- **`training/`** — fine-tuning, checkpointing, dataloaders, restart behavior.
-- **`inference/`** — model loading, serving startup, model cache, runtime behavior.
-
-The catalog grows as experiments earn their place in it. Most experiments stay internal; what surfaces here has been measured, framed, and packaged for someone else to repeat.
+The catalog grows as experiments earn their place in it (measured, framed, packaged for someone else to repeat) and as concept artifacts cover patterns that emerge across multiple experiments.
 
 ## Catalog
 
@@ -24,7 +25,11 @@ The catalog grows as experiments earn their place in it. Most experiments stay i
 
 ### inference
 
-(no public artifacts yet)
+(no public experimental artifacts yet)
+
+### concepts
+
+- **[storage-touchpoints-map](concepts/storage-touchpoints-map/storage-touchpoints-map.md)** (2026-05-23) — a storage practitioner's first-principles map of the LLM development pipeline (data prep → training → inference), enumerating where storage shows up at each stage, when it dominates, and when it doesn't. Anchored to four industry-standard references (MLPerf Storage, NVIDIA DGX SuperPOD, Google Cloud AI/ML storage architecture, NVIDIA GPU Direct Storage) and to the lab's measured experimental artifacts.
 
 ---
 

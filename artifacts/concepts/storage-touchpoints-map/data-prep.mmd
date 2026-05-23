@@ -1,0 +1,37 @@
+%%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
+flowchart LR
+    classDef storage    fill:#F59E0B,stroke:#B45309,color:#0B1020,stroke-width:1px
+    classDef compute    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef fabric     fill:#38BDF8,stroke:#0284C7,color:#0B1020,stroke-width:1px
+    classDef tier       fill:#0F172A,stroke:#475569,color:#F1F5F9,stroke-width:2px
+
+    UPSTREAM["<b>Upstream sources</b><br>web crawls, partner feeds,<br>customer logs, prior pipelines"]:::fabric
+
+    subgraph OBJ["<b>Object storage (durable foundation)</b> — raw + intermediate + final zones"]
+        direction TB
+        Z1["raw zone"]:::storage
+        Z2["cleaned zone"]:::storage
+        Z3["enriched zone"]:::storage
+        Z4["formatted zone"]:::storage
+        Z5["tokenized zone"]:::storage
+        Z6["sharded zone"]:::storage
+    end
+
+    subgraph WORKERS["<b>Distributed transformation</b> — Spark / Ray / Beam / Flink"]
+        direction TB
+        W1["clean + filter"]:::compute
+        W2["enrich + label"]:::compute
+        W3["format convert"]:::compute
+        W4["tokenize / encode"]:::compute
+        W5["shard"]:::compute
+    end
+
+    TRAINING["<b>Training-fast tier</b><br>parallel FS / local NVMe /<br>FUSE-mounted object"]:::tier
+
+    UPSTREAM ==>|"TP1 raw acquire"| Z1
+    Z1 --> W1 --> Z2
+    Z2 --> W2 --> Z3
+    Z3 --> W3 --> Z4
+    Z4 --> W4 --> Z5
+    Z5 --> W5 --> Z6
+    Z6 ==>|"TP7 stage to training"| TRAINING

@@ -1,0 +1,38 @@
+%%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
+flowchart TB
+    classDef storage    fill:#F59E0B,stroke:#B45309,color:#0B1020,stroke-width:1px
+    classDef compute    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef memory     fill:#00C2A8,stroke:#008F7E,color:#0B1020,stroke-width:1px
+    classDef fabric     fill:#38BDF8,stroke:#0284C7,color:#0B1020,stroke-width:1px
+    classDef tier       fill:#0F172A,stroke:#475569,color:#F1F5F9,stroke-width:2px
+
+    REQ["<b>Inbound request</b>"]:::fabric
+
+    REG["<b>Model registry</b><br>object store +<br>versioning"]:::storage
+
+    subgraph SERVING["<b>Serving pod</b> — vLLM / SGLang runtime"]
+        direction TB
+        LOADER["<b>TP1 cold start</b><br>loader (RunAI Streamer /<br>fastsafetensors / tensorizer)"]:::compute
+        WEIGHTS["model weights in<br>compute memory"]:::memory
+    end
+
+    subgraph KVTIER["<b>TP2/TP3 KV cache hierarchy</b> — read on hit, recompute on miss"]
+        direction TB
+        K1["GPU memory<br>fastest · smallest"]:::memory
+        K2["CPU RAM<br>~10× capacity"]:::memory
+        K3["Local NVMe<br>~100× capacity"]:::storage
+        K4["External store<br>longest tail"]:::storage
+        K1 <-->|"connector<br>(LMCache / InfiniStore /<br>Mooncake)"| K2
+        K2 <--> K3
+        K3 <--> K4
+    end
+
+    DECODE["<b>Decode pod</b><br>(if disaggregated)"]:::compute
+    LOG["<b>Audit log tier</b><br>object store /<br>NVMe sustained-write"]:::storage
+
+    REG ==>|"weights pull"| LOADER
+    LOADER --> WEIGHTS
+    REQ ==> SERVING
+    WEIGHTS <--> K1
+    SERVING -.->|"TP4 PD-disagg transfer<br>(fabric / memory-registration)"| DECODE
+    SERVING ==>|"TP6 audit log"| LOG

@@ -1,0 +1,44 @@
+%%{init: {'theme':'dark', 'flowchart': {'defaultRenderer': 'elk'}}}%%
+flowchart LR
+    classDef storage    fill:#F59E0B,stroke:#B45309,color:#0B1020,stroke-width:1px
+    classDef compute    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef fabric     fill:#38BDF8,stroke:#0284C7,color:#0B1020,stroke-width:1px
+    classDef memory     fill:#00C2A8,stroke:#008F7E,color:#0B1020,stroke-width:1px
+    classDef stage      fill:#0F172A,stroke:#475569,color:#F1F5F9,stroke-width:2px
+
+    subgraph DP["<b>Stage 1 · Data Preparation</b>"]
+        direction TB
+        DP1["<b>Raw acquire</b><br>network ingest"]:::fabric
+        DP2["<b>Tokenize / encode</b><br>CPU + writes"]:::compute
+        DP3["<b>Sharding</b><br>metadata + writes"]:::storage
+        DP4["<b>Stage to training</b><br>egress + ingest"]:::fabric
+        DP1 --> DP2 --> DP3 --> DP4
+    end
+
+    subgraph TR["<b>Stage 2 · Training / Fine-tuning</b>"]
+        direction TB
+        TR1["<b>Dataset stream</b><br>sequential read"]:::storage
+        TR2["<b>Model load</b><br>CPU or NVMe"]:::compute
+        TR3["<b>Checkpoint save</b><br>sustained write"]:::storage
+        TR4["<b>Checkpoint restore</b><br>sequential read"]:::storage
+        TR5["<b>Eval read</b><br>checkpoint + dataset"]:::memory
+        TR1 --> TR2 --> TR3
+        TR3 --> TR4
+        TR3 -.-> TR5
+    end
+
+    subgraph IN["<b>Stage 3 · Inference / Serving</b>"]
+        direction TB
+        IN1["<b>Cold start</b><br>loader-bound"]:::compute
+        IN2["<b>KV cache tiers</b><br>GPU mem → RAM → NVMe → ext"]:::memory
+        IN3["<b>PD-disagg transfer</b><br>fabric"]:::fabric
+        IN4["<b>Audit log</b><br>sustained write"]:::storage
+        IN1 --> IN2
+        IN2 -.-> IN3
+        IN2 --> IN4
+    end
+
+    DP4 ==>|"sharded dataset"| TR1
+    TR4 ==>|"trained checkpoint"| IN1
+
+    class DP,TR,IN stage

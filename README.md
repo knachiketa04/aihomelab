@@ -73,6 +73,7 @@ Full catalog with stage breakdown: [artifacts/](artifacts/).
 
 ## Where to start
 
+- **New to AI infrastructure storage and want the map first** → [artifacts/concepts/storage-touchpoints-map/storage-touchpoints-map.md](artifacts/concepts/storage-touchpoints-map/storage-touchpoints-map.md) — a storage practitioner's first-principles map of the LLM development pipeline (data prep → training → inference), with per-stage touch-point tables and anchors to MLPerf Storage, NVIDIA DGX SuperPOD, Google Cloud AI/ML storage, and NVIDIA GPU Direct Storage.
 - **Storage architect / capacity planner** → the results above, then [artifacts/scope-and-caveats.md](artifacts/scope-and-caveats.md) for what bounds the numbers.
 - **Have any single NVMe and want to baseline it** → [artifacts/data-prep/spark-nvme-fio-baseline/reproduce/](artifacts/data-prep/spark-nvme-fio-baseline/reproduce/) — 8 FIO jobs + orchestrator, ~30 min wall clock + 2.2 TB free disk.
 - **Have similar training hardware (DGX Spark, Grace, UMA platform) and want to try a finding** → [artifacts/training/full-sft-storage-touchpoints/reproduce/](artifacts/training/full-sft-storage-touchpoints/reproduce/) — 4 bash scripts (smoke / c25 / c100 / restore) plus an iostat-timeline analyzer; ~35 min wall clock + ~450 GB free disk.
