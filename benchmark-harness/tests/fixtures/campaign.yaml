@@ -1,0 +1,14 @@
+name: smoke-test
+description: Minimal campaign used by unit tests; not for real benchmarking.
+cluster:
+  nodes:
+    - { name: spark01, ssh: sparks@192.168.20.21 }
+targets:
+  - name: spark01-tmp
+    node: spark01
+    path: /tmp/harness-smoke/
+    kind: local-nvme
+    capacity_gib: 100
+scenarios_dir: scenarios
+runs:
+  - { scenario: fio/tiny.yaml, target: spark01-tmp }

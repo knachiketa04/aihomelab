@@ -1,0 +1,9 @@
+kind: fio
+name: tiny-smoke
+description: Minimal scenario used by unit tests; not for real benchmarking.
+global:
+  runtime: 5
+  ramp_time: 1
+  size: 100M
+jobs:
+  - { name: tiny-seqwrite, rw: write, bs: 1M, numjobs: 1, iodepth: 4 }
