@@ -29,14 +29,19 @@ def _ok_subprocess(monkeypatch):
 
     def fake_run(argv, capture_output, text, timeout=None, input=None):
         calls.append(argv)
-        # stat probe (testfile presence check) → return NONE so fallocate runs
         last = argv[-1]
+        # stat probe (testfile presence check) → return NONE so prefill runs
         if "stat -c %s" in last:
             return MagicMock(returncode=0, stdout="NONE\n", stderr="")
+        # marker check — say NO so prepare prefills
+        if "test -f" in last and ".prefilled" in last:
+            return MagicMock(returncode=0, stdout="NO\n", stderr="")
         # df probe → return plenty of free space
         if "df -B1" in last:
             return MagicMock(returncode=0, stdout="999999999999999\n", stderr="")
-        # fio invocation → return the sample JSON
+        # fio (either prefill or measurement)
+        if "fio --name=prefill" in last:
+            return MagicMock(returncode=0, stdout="", stderr="")
         if "fio --output-format=json+" in last:
             return MagicMock(returncode=0, stdout=SAMPLE_JSON, stderr="")
         return MagicMock(returncode=0, stdout="ok\n", stderr="")
@@ -81,6 +86,9 @@ def test_resume_skips_already_completed_scenarios(tmp_path, monkeypatch):
         last = argv[-1]
         if "stat -c %s" in last:
             return MagicMock(returncode=0, stdout="999999999999\n", stderr="")
+        if "test -f" in last and ".prefilled" in last:
+            # Marker present — prepare can skip prefill on resume.
+            return MagicMock(returncode=0, stdout="YES\n", stderr="")
         if "rm -f" in last:
             return MagicMock(returncode=0, stdout="", stderr="")
         return MagicMock(returncode=0, stdout="ok\n", stderr="")
@@ -198,6 +206,8 @@ def test_cli_run_preflight_recognizes_existing_workspace(tmp_path, monkeypatch):
         last = argv[-1]
         if "stat -c %s" in last and "testfile" in last:
             return MagicMock(returncode=0, stdout=str(2 * 1024**4) + "\n", stderr="")
+        if "test -f" in last and ".prefilled" in last:
+            return MagicMock(returncode=0, stdout="YES\n", stderr="")
         if "df -B1" in last:
             # 150 GiB free: enough for safety margin (100), but not for a 2 TiB
             # testfile if existing-file logic were absent.

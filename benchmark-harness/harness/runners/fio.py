@@ -5,18 +5,38 @@ Workflow per scenario:
   prepare:
     - mkdir -p target.path
     - capture env (fio --version, uname, df) into ctx.raw_dir/env-<node>.txt
-    - if testfile missing or smaller than scenario size: fallocate
-    - if testfile present and >= scenario size: skip (saves ~3 min on Gen5)
+    - if testfile missing or smaller than scenario size: prefill (write full
+      file with zeros via fio, then touch a .prefilled marker)
+    - if testfile present and >= scenario size BUT marker absent: prefill
+      again (the file's ext4 extents may still be in the "unwritten" state,
+      which makes O_DIRECT reads return zeros from a kernel zero-page without
+      ever issuing I/O to the drive — see methodology note below)
+    - if testfile present, >= scenario size, AND marker present: skip
+      (saves ~3-5 min on Gen5)
 
   run_jobs (per FioJob, in declaration order):
-    - if scenario.drop_caches_between_jobs: sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
+    - if scenario.drop_caches_between_jobs: sudo -n sync + sudo -n tee /proc/sys/vm/drop_caches
     - render the [global] + [job] fio config from scenario + job
     - pipe rendered config via ssh stdin to: `cat > /tmp/harness-<job>.fio && fio --output-format=json+ <path>`
     - capture stdout JSON to ctx.raw_dir/<scenario>/<job>.json
     - parse via parsers/fio.py, attach metrics to JobOutcome
 
   cleanup:
-    - rm target.path/testfile (the orchestrator decides whether to call this)
+    - rm target.path/testfile and target.path/testfile.prefilled (the
+      orchestrator decides whether to call this)
+
+Methodology note — why we prefill instead of just `fallocate`:
+
+  `fallocate -l SIZE FILE` reserves disk blocks but does NOT write data to
+  them. ext4 marks these extents "unwritten". When a process reads from an
+  unwritten extent — even with O_DIRECT — ext4 returns zeros from a kernel
+  zero-page without issuing I/O to the drive. This optimization is correct
+  but breaks read benchmarks: the harness would report read bandwidths far
+  above the drive's PCIe link ceiling because most "reads" never touched
+  the drive. Prefilling the file with one full-size sequential write forces
+  all extents into the "written" state. After that, reads exercise the
+  drive end-to-end. Cost: ~3-5 min one-time per testfile (comparable to
+  fallocate); amortized to zero across repeated runs that reuse the file.
 """
 from __future__ import annotations
 
@@ -33,6 +53,7 @@ from harness.runners.base import JobOutcome, Runner, RunContext
 from harness.ssh import RemoteError, df_free_bytes, run_remote, run_remote_sudo
 
 TESTFILE_NAME = "testfile"  # one file per target; reused across jobs
+PREFILLED_MARKER_SUFFIX = ".prefilled"  # sibling marker indicating full write completed
 
 
 _FIO_TEMPLATE = jinja2.Template(
@@ -110,16 +131,29 @@ class FioRunner(Runner):
         # 3. handle testfile.
         if ctx.dry_run:
             return
+        marker_path = _marker_path(testfile_path)
         existing_gib = _existing_testfile_gib(node, testfile_path)
+        prefilled = existing_gib is not None and _check_prefilled(node, marker_path)
         if existing_gib is None:
-            self._allocate_testfile(node, testfile_path, scenario.fio_global.size)
+            self._allocate_testfile(
+                node, testfile_path, marker_path, scenario.fio_global.size
+            )
         elif existing_gib < required_gib:
             raise RuntimeError(
                 f"existing testfile at {node.name}:{testfile_path} is {existing_gib} GiB, "
                 f"scenario {scenario.name!r} requires {required_gib} GiB. "
                 f"Aborting rather than silently extending (see experiment 007 gotcha)."
             )
-        # else: testfile big enough, reuse.
+        elif not prefilled:
+            # File exists at the right size but the .prefilled marker is missing.
+            # The file's extents may still be unwritten (e.g. from a previous
+            # fallocate-only allocation, or a crashed prior run). Re-prefill in
+            # place to force all extents into the "written" state. This rewrites
+            # the same on-disk space — no new allocation, no df-space change.
+            self._allocate_testfile(
+                node, testfile_path, marker_path, scenario.fio_global.size
+            )
+        # else: testfile big enough AND prefilled, reuse.
 
     def run_jobs(
         self,
@@ -174,10 +208,11 @@ class FioRunner(Runner):
         ctx: RunContext,
     ) -> None:
         testfile_path = _testfile_path(str(target.path))
+        marker_path = _marker_path(testfile_path)
         # -f tolerates already-absent file (idempotent).
         run_remote(
             node,
-            f"rm -f {shlex.quote(testfile_path)}",
+            f"rm -f {shlex.quote(testfile_path)} {shlex.quote(marker_path)}",
             dry_run=ctx.dry_run,
             timeout=30,
             check=False,
@@ -203,14 +238,26 @@ class FioRunner(Runner):
                 parts.append(f"## {label} (FAILED)\n{e}\n")
         return "\n".join(parts)
 
-    def _allocate_testfile(self, node: Node, path: str, size: str) -> None:
-        # fallocate is fast on ext4/xfs (~3 min for 2 TiB on Gen5). Falls back to
-        # truncate-then-write if fallocate isn't supported by the filesystem.
+    def _allocate_testfile(
+        self, node: Node, path: str, marker_path: str, size: str
+    ) -> None:
+        # Pre-fill the testfile with one full-size sequential write via fio. This
+        # forces every ext4 extent into the "written" state so subsequent O_DIRECT
+        # reads exercise the drive (and not the kernel's zero-page fast path for
+        # unwritten extents). See the module docstring "Methodology note" for the
+        # full reasoning. Cost: ~3-5 min for 2 TiB on Gen5 NVMe.
+        #
+        # On success, a sibling .prefilled marker is created so the next run can
+        # skip re-prefill. If fio fails, the marker is NOT created — the next run
+        # will retry the prefill.
         cmd = (
-            f"fallocate -l {shlex.quote(size)} {shlex.quote(path)} "
-            f"|| truncate -s {shlex.quote(size)} {shlex.quote(path)}"
+            f"fio --name=prefill --filename={shlex.quote(path)} "
+            f"--rw=write --bs=1M --size={shlex.quote(size)} "
+            f"--ioengine=libaio --direct=1 --iodepth=16 "
+            f"--end_fsync=1 --output-format=minimal > /dev/null "
+            f"&& touch {shlex.quote(marker_path)}"
         )
-        run_remote(node, cmd, timeout=1200)
+        run_remote(node, cmd, timeout=1800)
 
     def _drop_caches(self, node: Node, ctx: RunContext) -> None:
         # Two-step form so each sudo invocation can be whitelisted in
@@ -294,6 +341,10 @@ def _testfile_path(target_dir: str) -> str:
     return f"{base}/{TESTFILE_NAME}"
 
 
+def _marker_path(testfile_path: str) -> str:
+    return f"{testfile_path}{PREFILLED_MARKER_SUFFIX}"
+
+
 def _existing_testfile_gib(node: Node, path: str) -> int | None:
     """Return testfile size in GiB if it exists, else None."""
     r = run_remote(
@@ -310,3 +361,14 @@ def _existing_testfile_gib(node: Node, path: str) -> int | None:
     except ValueError:
         return None
     return size_bytes // (1024**3)
+
+
+def _check_prefilled(node: Node, marker_path: str) -> bool:
+    """True if the .prefilled marker exists on ``node``."""
+    r = run_remote(
+        node,
+        f"test -f {shlex.quote(marker_path)} && echo YES || echo NO",
+        check=False,
+        timeout=15,
+    )
+    return r.stdout.strip() == "YES"

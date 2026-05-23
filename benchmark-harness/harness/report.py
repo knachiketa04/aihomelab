@@ -21,7 +21,7 @@ from typing import Iterable
 import jinja2
 from pydantic import ValidationError
 
-from harness.config import FioJob, FioScenarioSpec, VendorSpec, load_campaign
+from harness.config import FioGlobal, FioJob, FioScenarioSpec, VendorSpec, load_campaign
 from harness.store import (
     ScenarioRow,
     StoredMetric,
@@ -30,6 +30,14 @@ from harness.store import (
     get_run_campaign_path,
     get_scenarios_for_run,
 )
+
+
+@dataclass(frozen=True)
+class JobContext:
+    """A FioJob bundled with its scenario's [global] block for wrap-detection."""
+
+    job: FioJob
+    fio_global: FioGlobal
 
 
 @dataclass
@@ -43,6 +51,7 @@ class ReportRow:
     p99_us: float | None
     pct_of_spec: float | None  # 0..100+, or None when unknown
     delta_vs_baseline_pct: float | None  # signed % change vs baseline
+    wrap_warning: bool = False  # per-thread bytes-consumed > per-thread region (10% slack)
 
 
 @dataclass
@@ -107,13 +116,17 @@ def _group_metrics(metrics: Iterable[StoredMetric]) -> dict[_MetricKey, float]:
 
 def _load_job_metadata(
     db_path: Path, run_id: str
-) -> tuple[dict[tuple[str, str], FioJob], VendorSpec | None]:
+) -> tuple[dict[tuple[str, str], JobContext], VendorSpec | None]:
     """Try to load the campaign YAML referenced by this run; return:
-    - {(scenario_name, job_name): FioJob}
+    - {(scenario_name, job_name): JobContext(job, fio_global)}
     - VendorSpec (or None)
 
+    The fio_global is included so the report can detect per-thread wraps
+    (per_thread_bw × runtime > per_thread_region implies cache-amplified
+    reads — see _detect_wrap below).
+
     Returns ({}, None) silently if the campaign file is missing or unreadable —
-    the report falls back to raw metrics without "% of spec".
+    the report falls back to raw metrics without "% of spec" or wrap detection.
     """
     cp = get_run_campaign_path(db_path, run_id)
     if not cp:
@@ -126,11 +139,13 @@ def _load_job_metadata(
     except (FileNotFoundError, ValidationError, ValueError):
         return {}, None
 
-    lookup: dict[tuple[str, str], FioJob] = {}
+    lookup: dict[tuple[str, str], JobContext] = {}
     for rr in resolved:
         if isinstance(rr.scenario, FioScenarioSpec):
             for job in rr.scenario.jobs:
-                lookup[(rr.scenario.name, job.name)] = job
+                lookup[(rr.scenario.name, job.name)] = JobContext(
+                    job=job, fio_global=rr.scenario.fio_global,
+                )
     return lookup, campaign.vendor_spec
 
 
@@ -138,7 +153,7 @@ def _build_section(
     s: ScenarioRow,
     metrics_by_key: dict[_MetricKey, float],
     base_by_key: dict[_MetricKey, float] | None,
-    job_lookup: dict[tuple[str, str], FioJob],
+    job_lookup: dict[tuple[str, str], JobContext],
     vendor_spec: VendorSpec | None,
 ) -> ScenarioSection:
     # Collect (job_name, op) pairs present in this scenario.
@@ -149,7 +164,8 @@ def _build_section(
 
     rows: list[ReportRow] = []
     for job_name, op in sorted(present):
-        job_meta = job_lookup.get((s.scenario_name, job_name))
+        ctx = job_lookup.get((s.scenario_name, job_name))
+        job_meta = ctx.job if ctx else None
         primary_label = _primary_metric(job_meta, op)
         primary_value = metrics_by_key.get(
             (s.scenario_name, s.repeat_idx, job_name, op, primary_label)
@@ -165,6 +181,7 @@ def _build_section(
             )
             if base_val and base_val != 0:
                 delta_baseline = (primary_value - base_val) / base_val * 100.0
+        wrap = _detect_wrap(ctx, op, primary_label, primary_value) if ctx else False
         rows.append(
             ReportRow(
                 job_name=job_name,
@@ -174,6 +191,7 @@ def _build_section(
                 p99_us=p99,
                 pct_of_spec=pct_spec,
                 delta_vs_baseline_pct=delta_baseline,
+                wrap_warning=wrap,
             )
         )
 
@@ -213,6 +231,69 @@ def _pct_of_spec(
     if not target:
         return None
     return value / target * 100.0
+
+
+_SIZE_BYTES_MULT = {
+    "k": 1024,
+    "m": 1024**2,
+    "g": 1024**3,
+    "t": 1024**4,
+    "p": 1024**5,
+}
+
+
+def _parse_size_bytes(s: str) -> int:
+    """Convert an fio-style size string ('128g', '2T', '100M') to bytes."""
+    raw = s.strip().lower()
+    if raw.endswith("ib"):
+        raw = raw[:-2]
+    elif raw.endswith("b"):
+        raw = raw[:-1]
+    unit = raw[-1]
+    if unit not in _SIZE_BYTES_MULT:
+        raise ValueError(f"unknown size suffix in {s!r}")
+    return int(float(raw[:-1]) * _SIZE_BYTES_MULT[unit])
+
+
+def _per_thread_region_bytes(job: FioJob, fio_global: FioGlobal) -> int | None:
+    """Return the per-thread bounded region in bytes, or None if unbounded.
+
+    A "bounded region" exists when either job.size or job.offset_increment is set
+    (the threads are kept within that window). Without either, threads share the
+    global filename and overlap — wrap detection isn't meaningful.
+
+    When both are set, the smaller wins (more conservative — flags wraps earlier).
+    """
+    candidates: list[int] = []
+    if job.size:
+        candidates.append(_parse_size_bytes(job.size))
+    if job.offset_increment:
+        candidates.append(_parse_size_bytes(job.offset_increment))
+    return min(candidates) if candidates else None
+
+
+def _detect_wrap(
+    ctx: JobContext, op: str, metric: str, value: float | None
+) -> bool:
+    """Flag rows where per-thread bytes consumed > per-thread region (10% slack).
+
+    A wrap means threads finished their region inside `runtime` and looped back.
+    Subsequent passes serve from drive DRAM or kernel page cache, inflating the
+    reported bandwidth above what the drive actually delivered. Writes are
+    excluded — direct=1 writes go to the drive each time, no amplification.
+    """
+    job = ctx.job
+    if metric != "bw_mbps" or value is None:
+        return False
+    if op != "read":
+        return False
+    if job.numjobs <= 1:
+        return False
+    region = _per_thread_region_bytes(job, ctx.fio_global)
+    if region is None:
+        return False
+    per_thread_bytes = (value / job.numjobs) * 1e6 * ctx.fio_global.runtime
+    return per_thread_bytes > region * 1.1
 
 
 def _spec_target(job: FioJob, op: str, metric: str, spec: VendorSpec) -> float | None:
@@ -256,10 +337,10 @@ _TEMPLATE = jinja2.Template(
 {% if not s.rows -%}
 *(no metrics recorded; scenario status: {{ s.status }})*
 {%- else -%}
-| Job | Op | Throughput / IOPS | p99 latency | % of spec{% if baseline %} | vs baseline{% endif %} |
-| --- | --- | ---: | ---: | ---:{% if baseline %} | ---:{% endif %} |
+| Job | Op | Throughput / IOPS | p99 latency | % of spec{% if baseline %} | vs baseline{% endif %} | notes |
+| --- | --- | ---: | ---: | ---:{% if baseline %} | ---:{% endif %} | --- |
 {% for r in s.rows -%}
-| {{ r.job_name }} | {{ r.op }} | {{ fmt_primary(r) }} | {{ fmt_p99(r) }} | {{ fmt_pct(r.pct_of_spec) }}{% if baseline %} | {{ fmt_delta(r.delta_vs_baseline_pct) }}{% endif %} |
+| {{ r.job_name }} | {{ r.op }} | {{ fmt_primary(r) }} | {{ fmt_p99(r) }} | {{ fmt_pct(r.pct_of_spec) }}{% if baseline %} | {{ fmt_delta(r.delta_vs_baseline_pct) }}{% endif %} | {{ fmt_notes(r) }} |
 {% endfor %}
 {%- endif %}
 {% endfor %}
@@ -294,9 +375,17 @@ def _fmt_delta(v: float | None) -> str:
     return f"{sign}{v:.1f}%"
 
 
+def _fmt_notes(r: ReportRow) -> str:
+    notes = []
+    if r.wrap_warning:
+        notes.append("⚠ wraps (cache-amplified)")
+    return "; ".join(notes) if notes else ""
+
+
 _TEMPLATE.globals.update(
     fmt_primary=_fmt_primary,
     fmt_p99=_fmt_p99,
     fmt_pct=_fmt_pct,
     fmt_delta=_fmt_delta,
+    fmt_notes=_fmt_notes,
 )

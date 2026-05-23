@@ -209,8 +209,6 @@ def test_run_jobs_handles_remote_failure(tmp_path, monkeypatch):
 
 def test_prepare_refuses_to_shrink_existing_testfile(tmp_path, monkeypatch):
     """If a smaller testfile exists, refuse rather than silently extend (007 gotcha)."""
-    # mkdir → ok, env probes → ok (4 calls), stat → returns smaller size.
-    # Sequence: mkdir, 4×env, stat. We'll be permissive: every call ok except stat.
     def fake_run(argv, capture_output, text, timeout=None, input=None):
         if "stat -c %s" in argv[-1]:
             # 1 GiB existing file; scenario asks for 100 GiB.
@@ -218,14 +216,88 @@ def test_prepare_refuses_to_shrink_existing_testfile(tmp_path, monkeypatch):
         return MagicMock(returncode=0, stdout="probe-ok\n", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-
     ctx = RunContext(run_id="r1", raw_dir=tmp_path, dry_run=False)
     scen = _scenario([FioJob(name="j1", rw="write", bs="1M")])
     with pytest.raises(RuntimeError, match="Aborting rather than silently extending"):
         FioRunner().prepare(scen, TARGET, NODE, ctx)
 
 
-def test_cleanup_uses_rm_minus_f(tmp_path, monkeypatch):
+def test_prepare_prefills_when_no_testfile_exists(tmp_path, monkeypatch):
+    """Fresh target → prepare writes the full testfile (no fallocate shortcut)."""
+    captured: list[list[str]] = []
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        captured.append(argv)
+        last = argv[-1]
+        if "stat -c %s" in last:
+            return MagicMock(returncode=0, stdout="NONE\n", stderr="")
+        return MagicMock(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    ctx = RunContext(run_id="r1", raw_dir=tmp_path, dry_run=False)
+    scen = _scenario([FioJob(name="j1", rw="write", bs="1M")])
+    FioRunner().prepare(scen, TARGET, NODE, ctx)
+
+    cmds = [a[-1] for a in captured]
+    prefill = [c for c in cmds if "fio --name=prefill" in c]
+    assert len(prefill) == 1
+    assert "--rw=write" in prefill[0]
+    assert "--direct=1" in prefill[0]
+    assert "--ioengine=libaio" in prefill[0]
+    assert "touch" in prefill[0]
+    assert ".prefilled" in prefill[0]
+
+
+def test_prepare_reprefills_when_marker_absent(tmp_path, monkeypatch):
+    """A big-enough testfile WITHOUT the .prefilled marker → re-prefill in place.
+
+    Catches the 'leftover from fallocate-only path' case where the file's
+    ext4 extents may still be unwritten (zero-fast-path inflates reads).
+    """
+    captured: list[list[str]] = []
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        captured.append(argv)
+        last = argv[-1]
+        if "stat -c %s" in last:
+            # File exists at full required size.
+            return MagicMock(returncode=0, stdout=str(200 * 1024**3) + "\n", stderr="")
+        if "test -f" in last and ".prefilled" in last:
+            return MagicMock(returncode=0, stdout="NO\n", stderr="")
+        return MagicMock(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    ctx = RunContext(run_id="r1", raw_dir=tmp_path, dry_run=False)
+    scen = _scenario([FioJob(name="j1", rw="write", bs="1M")])
+    FioRunner().prepare(scen, TARGET, NODE, ctx)
+
+    prefill = [a[-1] for a in captured if "fio --name=prefill" in a[-1]]
+    assert len(prefill) == 1, "should re-prefill in place when marker is absent"
+
+
+def test_prepare_skips_when_marker_present_and_file_big_enough(tmp_path, monkeypatch):
+    """Healthy state: testfile exists AND .prefilled marker → skip prefill."""
+    captured: list[list[str]] = []
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        captured.append(argv)
+        last = argv[-1]
+        if "stat -c %s" in last:
+            return MagicMock(returncode=0, stdout=str(200 * 1024**3) + "\n", stderr="")
+        if "test -f" in last and ".prefilled" in last:
+            return MagicMock(returncode=0, stdout="YES\n", stderr="")
+        return MagicMock(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    ctx = RunContext(run_id="r1", raw_dir=tmp_path, dry_run=False)
+    scen = _scenario([FioJob(name="j1", rw="write", bs="1M")])
+    FioRunner().prepare(scen, TARGET, NODE, ctx)
+
+    prefill = [a[-1] for a in captured if "fio --name=prefill" in a[-1]]
+    assert prefill == [], "should not prefill when marker is present"
+
+
+def test_cleanup_removes_testfile_and_marker(tmp_path, monkeypatch):
     captured: list[list[str]] = []
 
     def fake_run(argv, capture_output, text, timeout=None, input=None):
@@ -240,3 +312,4 @@ def test_cleanup_uses_rm_minus_f(tmp_path, monkeypatch):
     cmd = captured[0][-1]
     assert "rm -f" in cmd
     assert "testfile" in cmd
+    assert "testfile.prefilled" in cmd

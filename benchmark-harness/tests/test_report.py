@@ -88,6 +88,8 @@ def test_render_report_uses_vendor_spec_when_campaign_available(tmp_path, monkey
         last = argv[-1]
         if "stat -c %s" in last:
             return MagicMock(returncode=0, stdout="NONE\n", stderr="")
+        if "test -f" in last and ".prefilled" in last:
+            return MagicMock(returncode=0, stdout="NO\n", stderr="")
         if "fio --output-format=json+" in last:
             return MagicMock(returncode=0, stdout=SAMPLE_JSON, stderr="")
         return MagicMock(returncode=0, stdout="ok\n", stderr="")
@@ -180,3 +182,48 @@ def test_cli_report_default_output_path(tmp_path):
     assert result.exit_code == 0, result.output
     default_path = tmp_path / "reports" / f"{run_id}.md"
     assert default_path.exists()
+
+
+# ---- wrap-detection tests --------------------------------------------------
+
+
+from harness.config import FioGlobal, FioJob
+from harness.report import JobContext, _detect_wrap
+
+
+def _ctx(numjobs=16, size="128g", offset_increment="128g", runtime=180):
+    return JobContext(
+        job=FioJob(
+            name="seqread-16t", rw="read", bs="1M",
+            numjobs=numjobs, iodepth=1, size=size,
+            offset_increment=offset_increment,
+        ),
+        fio_global=FioGlobal(runtime=runtime),
+    )
+
+
+def test_wrap_detected_for_overamplified_read():
+    # 44 GB/s aggregate / 16 threads = 2.78 GB/s per-thread
+    # 2.78 GB/s × 180s = 500 GB consumed per thread
+    # region = 128 GiB → 500 / 137.4 ≈ 3.6× → wraps
+    assert _detect_wrap(_ctx(), op="read", metric="bw_mbps", value=44_500.0)
+
+
+def test_wrap_not_detected_for_normal_read():
+    # 10.5 GB/s / 16 threads = 656 MB/s per-thread
+    # 656 × 180s = 118 GB → fits within 128 GiB region
+    assert not _detect_wrap(_ctx(), op="read", metric="bw_mbps", value=10_500.0)
+
+
+def test_wrap_not_detected_for_writes_even_when_amplified():
+    # Writes don't get cache-amplified (direct=1 writes go to disk every time).
+    assert not _detect_wrap(_ctx(), op="write", metric="bw_mbps", value=44_500.0)
+
+
+def test_wrap_not_detected_for_single_thread():
+    assert not _detect_wrap(_ctx(numjobs=1), op="read", metric="bw_mbps", value=99_999.0)
+
+
+def test_wrap_not_detected_for_iops_metric():
+    # Wrap detection only makes sense for the bandwidth metric.
+    assert not _detect_wrap(_ctx(), op="read", metric="iops", value=99_999_999.0)
