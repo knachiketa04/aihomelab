@@ -20,8 +20,14 @@ from harness import __version__
 from harness.config import FioScenarioSpec, load_campaign, parse_size_gib
 from harness.orchestrator import allocate_run, find_latest_running_run, run_campaign
 from harness.report import render_report
+from harness.runners.fio import TESTFILE_NAME
 from harness.ssh import preflight_target
 from harness.store import list_runs as store_list_runs
+
+
+def _expected_workspace_file(target_path: Path) -> str:
+    """Return the path on the target where the fio Runner would put its testfile."""
+    return f"{str(target_path).rstrip('/')}/{TESTFILE_NAME}"
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -146,6 +152,7 @@ def preflight(campaign_path: Path, dry_run: bool) -> None:
             required_gib=requirements[target.name],
             safety_margin_gib=campaign.safety_margin_gib,
             dry_run=dry_run,
+            existing_file_path=_expected_workspace_file(target.path),
         )
         findings.append(finding)
         status = "[OK]  " if finding.ok else "[FAIL]"

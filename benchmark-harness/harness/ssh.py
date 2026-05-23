@@ -191,12 +191,19 @@ def preflight_target(
     safety_margin_gib: int,
     *,
     dry_run: bool = False,
+    existing_file_path: str | None = None,
 ) -> PreflightFinding:
     """Verify the target path is reachable and has enough free space.
 
     Does NOT raise on failure: returns a finding so the caller can aggregate
     across all targets before deciding whether to proceed. Idempotently
     creates the target directory if it doesn't exist.
+
+    If ``existing_file_path`` is provided and points to a file already at
+    ``required_gib`` or larger, the free-space check uses 0 incremental
+    bytes (the run will reuse the existing file). If the file exists but
+    is smaller than ``required_gib``, preflight fails fast — the runner
+    would refuse to extend it anyway (encodes the 007 gotcha).
     """
     path = str(target.path)
     if dry_run:
@@ -231,9 +238,36 @@ def preflight_target(
             message=f"df failed: {exc}",
             required_gib=required_gib,
         )
-
     free_gib = free_bytes // (1024**3)
-    needed = required_gib + safety_margin_gib
+
+    # Account for an existing usable file the runner would reuse rather than
+    # re-allocate. Three cases:
+    #   - file absent  : need full required_gib NEW.
+    #   - file >= req  : need 0 NEW (the file will be reused).
+    #   - file < req   : runner will refuse; fail preflight now with a clear msg.
+    existing_gib = _stat_file_size_gib(node, existing_file_path) if existing_file_path else None
+    if existing_gib is None or existing_file_path is None:
+        effective_required = required_gib
+        reuse_note = ""
+    elif existing_gib >= required_gib:
+        effective_required = 0
+        reuse_note = f", reusing existing {existing_gib} GiB workspace file"
+    else:
+        return PreflightFinding(
+            target_name=target.name,
+            node_name=node.name,
+            path=path,
+            ok=False,
+            free_gib=free_gib,
+            required_gib=required_gib,
+            message=(
+                f"existing file at {existing_file_path} is {existing_gib} GiB, "
+                f"smaller than required {required_gib} GiB. The runner refuses "
+                f"to extend it (007 silent-extend bug). Remove the file first."
+            ),
+        )
+
+    needed = effective_required + safety_margin_gib
     if free_gib < needed:
         return PreflightFinding(
             target_name=target.name,
@@ -243,7 +277,7 @@ def preflight_target(
             free_gib=free_gib,
             required_gib=required_gib,
             message=(
-                f"free space {free_gib} GiB < required {required_gib} GiB + "
+                f"free space {free_gib} GiB < required {effective_required} GiB + "
                 f"safety_margin {safety_margin_gib} GiB = {needed} GiB"
             ),
         )
@@ -254,5 +288,22 @@ def preflight_target(
         ok=True,
         free_gib=free_gib,
         required_gib=required_gib,
-        message=f"OK ({free_gib} GiB free; needs {needed} GiB)",
+        message=f"OK ({free_gib} GiB free; needs {needed} GiB{reuse_note})",
     )
+
+
+def _stat_file_size_gib(node: Node, path: str) -> int | None:
+    """Return file size in GiB if it exists on ``node``, else None."""
+    r = run_remote(
+        node,
+        f"stat -c %s {shlex.quote(path)} 2>/dev/null || echo NONE",
+        check=False,
+        timeout=15,
+    )
+    out = r.stdout.strip()
+    if not out or out == "NONE":
+        return None
+    try:
+        return int(out) // (1024**3)
+    except ValueError:
+        return None

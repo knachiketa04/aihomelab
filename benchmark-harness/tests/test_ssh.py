@@ -156,3 +156,73 @@ def test_preflight_dry_run_does_not_ssh(monkeypatch):
     monkeypatch.setattr(subprocess, "run", boom)
     finding = preflight_target(NODE, TARGET, 2048, 100, dry_run=True)
     assert finding.ok and "dry-run" in finding.message
+
+
+def test_preflight_passes_with_existing_full_size_workspace(monkeypatch):
+    """If a workspace file already exists at >= required size, free-space check
+    uses 0 incremental bytes — the runner will reuse the existing file."""
+    # mkdir ok, df returns ONLY 100 GiB free (well below the 2 TiB requirement),
+    # stat returns 2 TiB existing file. Preflight should PASS because no NEW
+    # allocation is needed.
+    bytes_2t = 2 * 1024**4
+    seq = iter([
+        ("", 0),                          # mkdir
+        (f"{100 * 1024**3}\n", 0),        # df: 100 GiB free
+        (f"{bytes_2t}\n", 0),             # stat existing workspace file
+    ])
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        stdout, code = next(seq)
+        return MagicMock(returncode=code, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    finding = preflight_target(
+        NODE, TARGET, required_gib=2048, safety_margin_gib=100,
+        existing_file_path="/home/sparks/bench/testfile",
+    )
+    assert finding.ok, finding.message
+    assert "reusing existing" in finding.message
+
+
+def test_preflight_fails_when_existing_workspace_too_small(monkeypatch):
+    """If a workspace file exists but is smaller than required, fail fast —
+    the runner refuses to extend (007 silent-extend gotcha)."""
+    seq = iter([
+        ("", 0),                                       # mkdir
+        (f"{3 * 1024**4}\n", 0),                       # df: 3 TiB free (plenty)
+        (f"{500 * 1024**3}\n", 0),                     # stat: only 500 GiB existing
+    ])
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        stdout, code = next(seq)
+        return MagicMock(returncode=code, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    finding = preflight_target(
+        NODE, TARGET, required_gib=2048, safety_margin_gib=100,
+        existing_file_path="/home/sparks/bench/testfile",
+    )
+    assert not finding.ok
+    assert "smaller than required" in finding.message
+    assert "007" in finding.message  # explains why we refuse to extend
+
+
+def test_preflight_when_workspace_absent_uses_full_required(monkeypatch):
+    """If no workspace file exists, free-space check uses the full required size."""
+    seq = iter([
+        ("", 0),                                       # mkdir
+        (f"{3 * 1024**4}\n", 0),                       # df: 3 TiB free
+        ("NONE\n", 0),                                 # stat: file doesn't exist
+    ])
+
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        stdout, code = next(seq)
+        return MagicMock(returncode=code, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    finding = preflight_target(
+        NODE, TARGET, required_gib=2048, safety_margin_gib=100,
+        existing_file_path="/home/sparks/bench/testfile",
+    )
+    assert finding.ok, finding.message
+    assert "reusing" not in finding.message
