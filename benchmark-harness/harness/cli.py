@@ -217,6 +217,7 @@ def run(campaign_path: Path, dry_run: bool, no_preflight: bool, results_root: Pa
                 target,
                 required_gib=requirements[target.name],
                 safety_margin_gib=campaign.safety_margin_gib,
+                existing_file_path=_expected_workspace_file(target.path),
             )
             status = "[OK]  " if finding.ok else "[FAIL]"
             click.echo(f"  {status} {finding.node_name}:{finding.target_name}  {finding.message}")

@@ -183,3 +183,34 @@ def test_cli_resume_without_campaign_or_runid_errors(tmp_path):
     )
     assert result.exit_code != 0
     assert "campaign path or --run-id" in result.output
+
+
+def test_cli_run_preflight_recognizes_existing_workspace(tmp_path, monkeypatch):
+    """Regression: `harness run` preflight must use existing_file_path so a
+    crashed-run-leftover testfile doesn't keep blocking future runs."""
+    # df reports less than a 2 TiB testfile would need; stat reports a full-size
+    # existing workspace file. The harness should preflight OK and proceed.
+    # smoke campaign uses tiny.yaml (size=100M → required_gib=0), but we want to
+    # simulate the real regression: large existing testfile, limited free space.
+    # The "reusing" message appears whenever the existing-file path was passed
+    # to preflight_target and a usable file was found.
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        last = argv[-1]
+        if "stat -c %s" in last and "testfile" in last:
+            return MagicMock(returncode=0, stdout=str(2 * 1024**4) + "\n", stderr="")
+        if "df -B1" in last:
+            # 150 GiB free: enough for safety margin (100), but not for a 2 TiB
+            # testfile if existing-file logic were absent.
+            return MagicMock(returncode=0, stdout=str(150 * 1024**3) + "\n", stderr="")
+        if "fio --output-format=json+" in last:
+            return MagicMock(returncode=0, stdout=SAMPLE_JSON, stderr="")
+        return MagicMock(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    result = CliRunner().invoke(
+        cli_main,
+        ["run", "--results-root", str(tmp_path), str(CAMPAIGN)],
+    )
+    # If the regression returns, the run would exit non-zero with "Preflight failed".
+    assert result.exit_code == 0, result.output
+    assert "reusing existing" in result.output
