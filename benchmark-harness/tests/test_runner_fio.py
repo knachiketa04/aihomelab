@@ -67,6 +67,26 @@ def test_render_mixed_includes_rwmixread():
     assert "rwmixread=70" in cfg
 
 
+def test_render_per_job_size_override():
+    # 007 pattern: 16-thread seq jobs need per-job size= to bound each thread's region.
+    job = FioJob(
+        name="seqread-16t", rw="read", bs="1M",
+        numjobs=16, iodepth=1, offset_increment="128g", size="128g",
+    )
+    cfg = render_fio_config(_scenario([job]), job, "/home/sparks/bench")
+    # Both global and per-job size appear; the per-job one wins in fio precedence.
+    assert "size=100G" in cfg  # global default from _scenario
+    assert "size=128g" in cfg  # per-job override
+
+
+def test_render_short_rw_alias_accepted():
+    # 007's mixed 70/30 job uses `rw=rw` (the fio short alias for `readwrite`).
+    job = FioJob(name="mixed", rw="rw", bs="1M", numjobs=1, iodepth=1, rwmixread=70)
+    cfg = render_fio_config(_scenario([job]), job, "/home/sparks/bench")
+    assert "rw=rw" in cfg
+    assert "rwmixread=70" in cfg
+
+
 def test_dry_run_writes_placeholder_and_does_not_ssh(tmp_path, monkeypatch):
     def boom(*a, **kw):
         pytest.fail("subprocess.run should not be called in dry-run mode")

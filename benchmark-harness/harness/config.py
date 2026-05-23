@@ -40,12 +40,17 @@ class FioJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    rw: Literal["read", "write", "randread", "randwrite", "readwrite", "randrw"]
+    rw: Literal["read", "write", "randread", "randwrite", "readwrite", "rw", "randrw"]
     bs: str
     numjobs: int = 1
     iodepth: int = 1
     offset_increment: str | None = None
     rwmixread: int | None = None
+    # Per-job size override (e.g. "128g" to split a 2T testfile into 16×128g
+    # regions). When None, the [global] size= applies. Required for multi-thread
+    # jobs that use offset_increment, to prevent threads from looping back to
+    # the start of the testfile and hitting drive DRAM cache. See experiment 007.
+    size: str | None = None
 
     @model_validator(mode="after")
     def _multi_thread_needs_offset(self) -> FioJob:

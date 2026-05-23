@@ -43,6 +43,33 @@ def test_cli_preflight_dry_run_does_not_ssh():
     assert "dry-run" in result.output
 
 
+def test_example_nvme_baseline_campaign_loads():
+    # The shipped example campaign + reference scenario must validate cleanly.
+    example = (
+        Path(__file__).parents[1]
+        / "campaigns" / "examples" / "nvme-baseline.yaml"
+    )
+    from harness.config import load_campaign
+    campaign, resolved = load_campaign(example)
+    assert campaign.name == "nvme-baseline-spark01"
+    assert len(resolved) == 1
+    scenario = resolved[0].scenario
+    assert scenario.name == "nvme-baseline-8job"
+    assert len(scenario.jobs) == 8
+    # Spot-check key 007 invariants made it through:
+    assert scenario.fio_global.ioengine == "libaio"
+    assert scenario.fio_global.runtime == 180
+    assert scenario.fio_global.size == "2T"
+    # Per-job size override on multi-thread jobs (the 007 disk-fill fix).
+    by_name = {j.name: j for j in scenario.jobs}
+    assert by_name["seqwrite-16t"].size == "128g"
+    assert by_name["seqwrite-16t"].offset_increment == "128g"
+    assert by_name["randread-4k-qd64"].numjobs == 4
+    assert by_name["randread-4k-qd64"].iodepth == 64
+    assert by_name["mixed-rw7030"].rw == "rw"
+    assert by_name["mixed-rw7030"].rwmixread == 70
+
+
 def test_multi_thread_without_offset_rejected():
     # The 007 gotcha: numjobs>1 without offset_increment serves from drive DRAM cache.
     with pytest.raises(ValidationError):

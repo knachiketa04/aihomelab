@@ -56,6 +56,9 @@ iodepth={{ job.iodepth }}
 {% if job.offset_increment -%}
 offset_increment={{ job.offset_increment }}
 {% endif -%}
+{% if job.size -%}
+size={{ job.size }}
+{% endif -%}
 {% if job.rwmixread is not none -%}
 rwmixread={{ job.rwmixread }}
 {% endif -%}

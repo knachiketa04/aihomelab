@@ -1,0 +1,73 @@
+# Port of experiment 007's 8-job canonical NVMe sweep.
+#
+# Covers four storage dimensions on a single drive:
+#   - Single-thread vs. 16-thread sequential (write + read)
+#   - Random IOPS ceiling (4k QD64, 4 threads, read + write)
+#   - Random latency floor (4k QD1, single thread)
+#   - Mixed 70/30 1MB (training-pattern proxy, 8 threads)
+#
+# Three load-bearing details:
+#   1. ioengine=libaio (matches 007; io_uring would give different numbers).
+#   2. Per-job size= bounds each thread's region so no thread loops back into
+#      the drive DRAM cache mid-run. Required for clean multi-thread numbers
+#      (see .agent-notes/gotchas.md and experiment 007's disk-fill incident).
+#   3. 2 TiB testfile, 180 s per job — derived from
+#      runtime × (per-thread bw) ≥ per-thread region, so threads barely
+#      complete one pass.
+#
+# Expected runtime: 8 jobs × ~3 min/job + cache drops + alloc ≈ 30–35 min once
+# the testfile exists (testfile pre-allocation is one-time, ~3 min on Gen5).
+
+kind: fio
+name: nvme-baseline-8job
+description: 8-job canonical sweep covering seq, rand, latency, and mixed dimensions on a single NVMe drive.
+
+global:
+  ioengine: libaio
+  direct: 1
+  time_based: 1
+  runtime: 180
+  ramp_time: 10
+  end_fsync: 1     # no-op for read-only jobs; matches write/mixed-job behavior
+  group_reporting: 1
+  size: 2T
+
+drop_caches_between_jobs: true
+timeout_seconds: 600   # per-job safety bound (3× runtime); aborts if a job hangs
+
+jobs:
+  # 01 — single-thread sequential write, 1 MB blocks.
+  # Establishes "what one thread can extract" baseline. Time-average across
+  # SLC + post-SLC TLC fall-off.
+  - { name: seqwrite-1t,    rw: write,     bs: 1M, numjobs: 1,  iodepth: 1 }
+
+  # 02 — 16-thread sequential write. Multi-thread ceiling for write.
+  # Per-thread region = 128 GiB (16 × 128 = 2 TiB testfile).
+  - { name: seqwrite-16t,   rw: write,     bs: 1M, numjobs: 16, iodepth: 1,
+      offset_increment: 128g, size: 128g }
+
+  # 03 — single-thread sequential read. Per-thread read rate the drive sustains.
+  - { name: seqread-1t,     rw: read,      bs: 1M, numjobs: 1,  iodepth: 1 }
+
+  # 04 — 16-thread sequential read. Multi-thread ceiling for read.
+  # Per-thread region = 128 GiB; bounds prevent thread-loop cache amplification.
+  - { name: seqread-16t,    rw: read,      bs: 1M, numjobs: 16, iodepth: 1,
+      offset_increment: 128g, size: 128g }
+
+  # 05 — random 4k read, 4 threads × QD64. IOPS ceiling for read.
+  # 512 GiB per-thread region (4 × 512 GiB = 2 TiB).
+  - { name: randread-4k-qd64,  rw: randread,  bs: 4k, numjobs: 4, iodepth: 64,
+      offset_increment: 512g, size: 512g }
+
+  # 06 — random 4k write, 4 threads × QD64. IOPS ceiling for write.
+  - { name: randwrite-4k-qd64, rw: randwrite, bs: 4k, numjobs: 4, iodepth: 64,
+      offset_increment: 512g, size: 512g }
+
+  # 07 — random 4k read, single thread, QD1. Latency floor.
+  # Headline metric for this job is p99 latency in µs, not bandwidth.
+  - { name: randread-4k-qd1,   rw: randread,  bs: 4k, numjobs: 1, iodepth: 1 }
+
+  # 08 — mixed 70% read / 30% write, 1 MB blocks, 8 threads. Training proxy.
+  # 256 GiB per-thread region (8 × 256 GiB = 2 TiB).
+  - { name: mixed-rw7030, rw: rw, bs: 1M, numjobs: 8, iodepth: 1, rwmixread: 70,
+      offset_increment: 256g, size: 256g }

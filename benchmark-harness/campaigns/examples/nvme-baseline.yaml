@@ -1,0 +1,41 @@
+# Example campaign: run nvme-baseline-8job against a single local NVMe.
+#
+# Copy this file into your experiment directory and fill in node/path
+# specifics. Per the harness's public/private model, the version under
+# benchmark-harness/campaigns/examples/ is the *template*; the version
+# under experiments/<NNN>/campaign.yaml is your specific run.
+
+name: nvme-baseline-spark01
+description: Reproduce experiment 007's 8-job NVMe matrix via the harness, single node.
+
+cluster:
+  nodes:
+    - { name: spark01, ssh: <user>@<host-or-ip> }
+
+targets:
+  - name: spark01-nvme
+    node: spark01
+    path: /home/<user>/bench-harness/      # any directory on the local NVMe with ≥ 2.2 TiB free
+    kind: local-nvme
+    capacity_gib: 3700
+    notes: Samsung 9100 PRO Gen5 x4
+
+# Optional: vendor reference numbers, surfaced as "% of spec" columns in
+# the report. Defaults below match the Samsung 9100 PRO 4 TB datasheet.
+vendor_spec:
+  label: Samsung 9100 PRO 4 TB (Gen5 x4)
+  seqwrite_mbps: 13400
+  seqread_mbps: 14800
+  randread_iops: 2200000
+  randwrite_iops: 2600000
+
+# scenarios_dir is relative to this campaign file. The path below resolves the
+# scenario from this example's location (benchmark-harness/campaigns/examples/).
+# After copying to experiments/<NNN>/campaign.yaml, change this to:
+#     scenarios_dir: ../../benchmark-harness/scenarios
+scenarios_dir: ../../scenarios
+cleanup: after_campaign
+safety_margin_gib: 100
+
+runs:
+  - { scenario: fio/nvme-baseline-8job.yaml, target: spark01-nvme }
