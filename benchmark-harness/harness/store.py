@@ -83,6 +83,30 @@ class RunRow:
     raw_dir: str
 
 
+@dataclass(frozen=True)
+class ScenarioRow:
+    scenario_name: str
+    repeat_idx: int
+    kind: str
+    target_name: str
+    target_node: str
+    target_path: str
+    status: str
+    started_at: str
+    ended_at: str | None
+    error: str | None
+
+
+@dataclass(frozen=True)
+class StoredMetric:
+    scenario_name: str
+    repeat_idx: int
+    job_name: str
+    op: str
+    metric: str
+    value: float
+
+
 def _now() -> str:
     return datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
 
@@ -154,6 +178,39 @@ def get_run(db_path: Path, run_id: str) -> RunRow | None:
             (run_id,),
         ).fetchone()
     return RunRow(*row) if row else None
+
+
+def get_run_campaign_path(db_path: Path, run_id: str) -> str | None:
+    """Return the campaign file path stored at run creation, or None."""
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT campaign_path FROM runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+    return row[0] if row else None
+
+
+def get_scenarios_for_run(db_path: Path, run_id: str) -> list[ScenarioRow]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT scenario_name, repeat_idx, kind, target_name, target_node,"
+            " target_path, status, started_at, ended_at, error"
+            " FROM scenarios WHERE run_id = ?"
+            " ORDER BY started_at, scenario_name, repeat_idx",
+            (run_id,),
+        ).fetchall()
+    return [ScenarioRow(*r) for r in rows]
+
+
+def get_all_metrics(db_path: Path, run_id: str) -> list[StoredMetric]:
+    """Return every metric for a run, with the (scenario, repeat, job) keys preserved."""
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT scenario_name, repeat_idx, job_name, op, metric, value"
+            " FROM metrics WHERE run_id = ?"
+            " ORDER BY scenario_name, repeat_idx, job_name, op, metric",
+            (run_id,),
+        ).fetchall()
+    return [StoredMetric(*r) for r in rows]
 
 
 # ---- Scenarios ---------------------------------------------------------------

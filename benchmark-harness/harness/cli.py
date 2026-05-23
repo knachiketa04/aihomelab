@@ -6,6 +6,7 @@ v0 commands:
   harness run <campaign.yaml>           preflight, then execute the campaign
   harness resume <campaign.yaml>        resume the latest in-progress run
   harness list-runs                     show stored runs (newest first)
+  harness report <run-id>               render a markdown report for a run
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from pydantic import ValidationError
 from harness import __version__
 from harness.config import FioScenarioSpec, load_campaign, parse_size_gib
 from harness.orchestrator import allocate_run, find_latest_running_run, run_campaign
+from harness.report import render_report
 from harness.ssh import preflight_target
 from harness.store import list_runs as store_list_runs
 
@@ -304,6 +306,49 @@ def list_runs_cmd(results_root: Path) -> None:
     click.echo(f"{'run_id':<48} {'campaign':<24} {'status':<10} started_at")
     for r in rows:
         click.echo(f"{r.run_id:<48} {r.campaign_name:<24} {r.status:<10} {r.started_at}")
+
+
+@main.command()
+@click.argument("run_id")
+@click.option("--baseline", "baseline_run_id", help="Run ID to diff against.")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(path_type=Path),
+    help="Output path. Default: <results-root>/reports/<run_id>.md",
+)
+@click.option(
+    "--results-root",
+    type=click.Path(path_type=Path),
+    default=Path("results"),
+    show_default=True,
+)
+def report(
+    run_id: str,
+    baseline_run_id: str | None,
+    output: Path | None,
+    results_root: Path,
+) -> None:
+    """Render a markdown report for RUN_ID.
+
+    Reads the SQLite store at <results-root>/harness.db. If the campaign
+    YAML referenced by the run is still on disk, jobs are classified
+    (seq vs rand) and "% of spec" is computed from vendor_spec.
+    """
+    db = results_root / "harness.db"
+    if not db.exists():
+        click.echo(f"no harness.db at {db}", err=True)
+        sys.exit(1)
+    try:
+        text = render_report(db, run_id, baseline_run_id=baseline_run_id)
+    except ValueError as e:
+        click.echo(f"[FAIL] {e}", err=True)
+        sys.exit(1)
+
+    out_path = output or (results_root / "reports" / f"{run_id}.md")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(text)
+    click.echo(f"wrote {out_path}")
 
 
 if __name__ == "__main__":
