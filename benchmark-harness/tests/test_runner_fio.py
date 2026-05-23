@@ -135,7 +135,7 @@ def test_run_jobs_captures_json_and_parses_metrics(tmp_path, monkeypatch):
 
 
 def test_run_jobs_drops_caches_when_enabled(tmp_path, monkeypatch):
-    """drop_caches_between_jobs=True produces two extra ssh calls per job (sudo -n sync, sudo -n tee)."""
+    """drop_caches_between_jobs=True adds two ssh calls per job: sudo -n sync, sudo -n tee."""
     captured_argvs: list[list[str]] = []
 
     def fake_run(argv, capture_output, text, timeout=None, input=None):

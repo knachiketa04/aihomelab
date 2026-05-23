@@ -17,7 +17,8 @@ Workflow per scenario:
   run_jobs (per FioJob, in declaration order):
     - if scenario.drop_caches_between_jobs: sudo -n sync + sudo -n tee /proc/sys/vm/drop_caches
     - render the [global] + [job] fio config from scenario + job
-    - pipe rendered config via ssh stdin to: `cat > /tmp/harness-<job>.fio && fio --output-format=json+ <path>`
+    - pipe rendered config via ssh stdin to:
+        `cat > /tmp/harness-<job>.fio && fio --output-format=json+ <path>`
     - capture stdout JSON to ctx.raw_dir/<scenario>/<job>.json
     - parse via parsers/fio.py, attach metrics to JobOutcome
 
@@ -42,15 +43,23 @@ from __future__ import annotations
 
 import shlex
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import ClassVar, Iterator
+from typing import ClassVar
 
 import jinja2
 
-from harness.config import FioJob, FioScenarioSpec, Node, ScenarioSpec, StorageTarget, parse_size_gib
+from harness.config import (
+    FioJob,
+    FioScenarioSpec,
+    Node,
+    ScenarioSpec,
+    StorageTarget,
+    parse_size_gib,
+)
 from harness.parsers.fio import parse_fio_json
-from harness.runners.base import JobOutcome, Runner, RunContext
-from harness.ssh import RemoteError, df_free_bytes, run_remote, run_remote_sudo
+from harness.runners.base import JobOutcome, RunContext, Runner
+from harness.ssh import RemoteError, run_remote
 
 TESTFILE_NAME = "testfile"  # one file per target; reused across jobs
 PREFILLED_MARKER_SUFFIX = ".prefilled"  # sibling marker indicating full write completed

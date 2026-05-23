@@ -187,12 +187,14 @@ class Campaign(BaseModel):
         for t in self.targets:
             if t.node not in node_names:
                 raise ValueError(
-                    f"target {t.name!r}: node {t.node!r} not in cluster.nodes ({sorted(node_names)})"
+                    f"target {t.name!r}: node {t.node!r} "
+                    f"not in cluster.nodes ({sorted(node_names)})"
                 )
         for i, r in enumerate(self.runs):
             if r.target not in target_names:
                 raise ValueError(
-                    f"runs[{i}]: target {r.target!r} not in campaign.targets ({sorted(target_names)})"
+                    f"runs[{i}]: target {r.target!r} "
+                    f"not in campaign.targets ({sorted(target_names)})"
                 )
         return self
 

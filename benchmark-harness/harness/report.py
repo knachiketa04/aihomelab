@@ -14,9 +14,9 @@ operator-facing entry point.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import jinja2
 from pydantic import ValidationError
@@ -315,39 +315,13 @@ def _spec_target(job: FioJob, op: str, metric: str, spec: VendorSpec) -> float |
 
 # ---- template ---------------------------------------------------------------
 
-
-_TEMPLATE = jinja2.Template(
-    """# Run {{ run.run_id }}
-
-- **Campaign:** {{ run.campaign_name }}
-- **Started:** {{ run.started_at }}
-- **Ended:** {{ run.ended_at or "(in progress)" }}
-- **Status:** {{ run.status }}
-{% if baseline -%}
-- **Baseline:** {{ baseline.run_id }} ({{ baseline.started_at }})
-{% endif -%}
-{% if vendor_spec and vendor_spec.label %}
-- **Spec reference:** {{ vendor_spec.label }}
-{% endif %}
-
-## Per-scenario results
-{% for s in sections %}
-### {{ s.scenario_name }}{% if s.repeat_idx %} (repeat {{ s.repeat_idx }}){% endif %} → {{ s.target_name }}
-
-{% if not s.rows -%}
-*(no metrics recorded; scenario status: {{ s.status }})*
-{%- else -%}
-| Job | Op | Throughput / IOPS | p99 latency | % of spec{% if baseline %} | vs baseline{% endif %} | notes |
-| --- | --- | ---: | ---: | ---:{% if baseline %} | ---:{% endif %} | --- |
-{% for r in s.rows -%}
-| {{ r.job_name }} | {{ r.op }} | {{ fmt_primary(r) }} | {{ fmt_p99(r) }} | {{ fmt_pct(r.pct_of_spec) }}{% if baseline %} | {{ fmt_delta(r.delta_vs_baseline_pct) }}{% endif %} | {{ fmt_notes(r) }} |
-{% endfor %}
-{%- endif %}
-{% endfor %}
-""",
+_TEMPLATE_DIR = Path(__file__).parent / "templates"
+_ENV = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(_TEMPLATE_DIR),
     trim_blocks=True,
     lstrip_blocks=True,
 )
+_TEMPLATE = _ENV.get_template("report.md.j2")
 
 
 def _fmt_primary(r: ReportRow) -> str:
@@ -382,7 +356,7 @@ def _fmt_notes(r: ReportRow) -> str:
     return "; ".join(notes) if notes else ""
 
 
-_TEMPLATE.globals.update(
+_ENV.globals.update(
     fmt_primary=_fmt_primary,
     fmt_p99=_fmt_p99,
     fmt_pct=_fmt_pct,

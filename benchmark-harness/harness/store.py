@@ -14,11 +14,11 @@ concurrent writers are not supported (one orchestrator per DB at a time).
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Iterator
 
 from harness.parsers.fio import MetricRecord
 
@@ -108,7 +108,7 @@ class StoredMetric:
 
 
 def _now() -> str:
-    return datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(tz=UTC).isoformat(timespec="seconds")
 
 
 def init_db(db_path: Path) -> None:
@@ -144,10 +144,17 @@ def start_run(
     init_db(db_path)
     with _connect(db_path) as conn:
         conn.execute(
-            "INSERT INTO runs(run_id, campaign_name, campaign_path, started_at, status, raw_dir, notes)"
+            "INSERT INTO runs(run_id, campaign_name, campaign_path, started_at,"
+            " status, raw_dir, notes)"
             " VALUES (?, ?, ?, ?, 'running', ?, ?)",
-            (run_id, campaign_name, str(campaign_path) if campaign_path else None,
-             _now(), str(raw_dir), notes),
+            (
+                run_id,
+                campaign_name,
+                str(campaign_path) if campaign_path else None,
+                _now(),
+                str(raw_dir),
+                notes,
+            ),
         )
 
 

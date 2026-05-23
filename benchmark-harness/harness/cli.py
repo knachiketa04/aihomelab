@@ -222,7 +222,10 @@ def run(campaign_path: Path, dry_run: bool, no_preflight: bool, results_root: Pa
             status = "[OK]  " if finding.ok else "[FAIL]"
             click.echo(f"  {status} {finding.node_name}:{finding.target_name}  {finding.message}")
             if not finding.ok:
-                click.echo("\nPreflight failed. Aborting (use --no-preflight to override).", err=True)
+                click.echo(
+                    "\nPreflight failed. Aborting (use --no-preflight to override).",
+                    err=True,
+                )
                 sys.exit(1)
 
     # Pre-allocate raw_dir so we can open the orchestrator.log file alongside it.

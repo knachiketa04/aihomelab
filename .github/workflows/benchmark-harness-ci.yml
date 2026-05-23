@@ -1,0 +1,67 @@
+name: benchmark-harness CI
+
+on:
+  push:
+    paths:
+      - 'benchmark-harness/**'
+      - '.github/workflows/benchmark-harness-ci.yml'
+  pull_request:
+    paths:
+      - 'benchmark-harness/**'
+      - '.github/workflows/benchmark-harness-ci.yml'
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint, test, validate scenarios
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: benchmark-harness
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python (3.11, matches pyproject floor)
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check harness tests
+
+      - name: Run unit tests
+        run: uv run pytest -v
+
+      - name: Schema-validate every shipped example campaign
+        # Validates scenarios transitively (each campaign loads its scenarios).
+        # Fails CI if any shipped YAML drifts away from the pydantic schema.
+        run: |
+          shopt -s nullglob
+          failures=0
+          for campaign in campaigns/examples/*.yaml; do
+            echo "::group::Validating $campaign"
+            if uv run harness validate "$campaign"; then
+              echo "OK: $campaign"
+            else
+              echo "::error file=$campaign::schema validation failed"
+              failures=$((failures + 1))
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failures" -gt 0 ]; then
+            echo "$failures campaign(s) failed schema validation."
+            exit 1
+          fi
+
+      - name: CLI smoke test (--help exits 0)
+        run: uv run harness --help

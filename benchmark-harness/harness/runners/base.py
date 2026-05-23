@@ -8,9 +8,10 @@ MLPerf Storage stubs the interface for v0.1.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Iterator, Literal
+from typing import ClassVar, Literal
 
 from harness.config import Node, ScenarioSpec, StorageTarget
 from harness.parsers.fio import MetricRecord

@@ -6,8 +6,8 @@ sees a happy path unless the test deliberately injects a failure.
 """
 from __future__ import annotations
 
-import subprocess
 import sqlite3
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -16,7 +16,7 @@ from click.testing import CliRunner
 
 from harness.cli import main as cli_main
 from harness.orchestrator import find_latest_running_run, run_campaign
-from harness.store import get_metrics_for_run, get_run, list_runs
+from harness.store import get_metrics_for_run, get_run
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CAMPAIGN = FIXTURES / "campaign.yaml"

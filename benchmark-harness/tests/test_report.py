@@ -9,16 +9,17 @@ import pytest
 from click.testing import CliRunner
 
 from harness.cli import main as cli_main
+from harness.config import FioGlobal, FioJob
 from harness.orchestrator import run_campaign
 from harness.parsers.fio import MetricRecord
-from harness.report import render_report
+from harness.report import JobContext, _detect_wrap, render_report
 from harness.store import (
+    finish_run,
+    finish_scenario,
     init_db,
     record_metrics,
     start_run,
     start_scenario,
-    finish_scenario,
-    finish_run,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -110,7 +111,8 @@ def test_render_report_uses_vendor_spec_when_campaign_available(tmp_path, monkey
     camp.write_text(
         "name: vendor-spec-test\n"
         "cluster: { nodes: [{ name: spark01, ssh: sparks@x }] }\n"
-        "targets:\n  - { name: t, node: spark01, path: /tmp/x, kind: local-nvme, capacity_gib: 100 }\n"
+        "targets:\n"
+        "  - { name: t, node: spark01, path: /tmp/x, kind: local-nvme, capacity_gib: 100 }\n"
         "vendor_spec:\n"
         "  label: Sample Drive\n"
         "  seqwrite_mbps: 14000\n"
@@ -185,10 +187,6 @@ def test_cli_report_default_output_path(tmp_path):
 
 
 # ---- wrap-detection tests --------------------------------------------------
-
-
-from harness.config import FioGlobal, FioJob
-from harness.report import JobContext, _detect_wrap
 
 
 def _ctx(numjobs=16, size="128g", offset_increment="128g", runtime=180):

@@ -100,7 +100,10 @@ def _run(
         )
     except subprocess.TimeoutExpired as exc:
         elapsed = time.monotonic() - t0
-        stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
+        if isinstance(exc.stdout, str):
+            stdout = exc.stdout
+        else:
+            stdout = (exc.stdout or b"").decode(errors="replace")
         result = RemoteResult(
             node=node_name,
             command=command,

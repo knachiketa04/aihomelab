@@ -10,9 +10,9 @@ and the Runner skips SSH. Net effect: print the plan, touch nothing.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 from harness.config import Campaign, ResolvedRun, load_campaign
 from harness.runners.base import RunContext, Runner
@@ -42,7 +42,7 @@ def register_runner(kind: str, cls: type[Runner]) -> None:
 
 
 def _new_run_id(campaign_name: str) -> str:
-    return f"{campaign_name}-{datetime.now(tz=timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+    return f"{campaign_name}-{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%S')}"
 
 
 def find_latest_running_run(
@@ -225,8 +225,9 @@ def _execute_scenario(
                 )
             else:
                 scenario_failed = True
+                err = outcome.error or "(no error message)"
                 progress(
-                    f"  [{outcome.status.upper()}] {outcome.job_name}: {outcome.error or '(no error message)'}"
+                    f"  [{outcome.status.upper()}] {outcome.job_name}: {err}"
                 )
 
         status = "failed" if scenario_failed else "ok"
