@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 480" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#475569"/>
+    </marker>
+    <style>
+      .lyr { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.5; rx: 8; }
+      .lyr-l { font-weight: 600; fill: #1e293b; font-size: 14px; }
+      .box  { fill: #ffffff; stroke: #475569; stroke-width: 1.5; rx: 6; }
+      .input{ fill: #fef3c7; stroke: #b45309; stroke-width: 1.5; rx: 6; }
+      .db   { fill: #dbeafe; stroke: #1d4ed8; stroke-width: 1.5; }
+      .out  { fill: #dcfce7; stroke: #15803d; stroke-width: 1.5; rx: 6; }
+      .txt  { fill: #0f172a; }
+      .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 11px; fill: #334155; }
+      .arrow{ stroke: #475569; stroke-width: 1.8; fill: none; }
+      .lbl  { fill: #64748b; font-size: 11px; }
+    </style>
+  </defs>
+
+  <!-- Inputs -->
+  <rect class="input" x="20" y="40" width="160" height="60"/>
+  <text class="txt" x="100" y="62" text-anchor="middle" font-weight="600">Scenario YAML</text>
+  <text class="mono" x="100" y="80" text-anchor="middle">scenarios/fio/*.yaml</text>
+
+  <rect class="input" x="20" y="380" width="160" height="60"/>
+  <text class="txt" x="100" y="402" text-anchor="middle" font-weight="600">Campaign YAML</text>
+  <text class="mono" x="100" y="420" text-anchor="middle">your experiment</text>
+
+  <!-- Layer 1: Automation -->
+  <rect class="lyr" x="220" y="160" width="180" height="160"/>
+  <text class="lyr-l" x="310" y="180" text-anchor="middle">1 · Automation</text>
+  <rect class="box" x="240" y="200" width="140" height="100"/>
+  <text class="mono" x="310" y="220" text-anchor="middle">ssh.py</text>
+  <text class="mono" x="310" y="240" text-anchor="middle">run_remote</text>
+  <text class="mono" x="310" y="258" text-anchor="middle">df_free_bytes</text>
+  <text class="mono" x="310" y="276" text-anchor="middle">preflight_target</text>
+  <text class="mono" x="310" y="294" text-anchor="middle">sudo -n + ssh -t</text>
+
+  <!-- Layer 2: Execution -->
+  <rect class="lyr" x="440" y="60" width="220" height="360"/>
+  <text class="lyr-l" x="550" y="80" text-anchor="middle">2 · Execution</text>
+  <rect class="box" x="460" y="100" width="180" height="90"/>
+  <text class="mono" x="550" y="120" text-anchor="middle" font-weight="600">orchestrator.py</text>
+  <text class="mono" x="550" y="140" text-anchor="middle">walks Campaign</text>
+  <text class="mono" x="550" y="158" text-anchor="middle">dispatches Runners</text>
+  <text class="mono" x="550" y="176" text-anchor="middle">resume-from-crash</text>
+
+  <rect class="box" x="460" y="220" width="180" height="180"/>
+  <text class="mono" x="550" y="240" text-anchor="middle" font-weight="600">runners/fio.py</text>
+  <text class="mono" x="550" y="262" text-anchor="middle">prepare ↴</text>
+  <text class="mono" x="550" y="280" text-anchor="middle">  prefill testfile</text>
+  <text class="mono" x="550" y="298" text-anchor="middle">run_jobs ↴</text>
+  <text class="mono" x="550" y="316" text-anchor="middle">  drop_caches</text>
+  <text class="mono" x="550" y="334" text-anchor="middle">  render .fio</text>
+  <text class="mono" x="550" y="352" text-anchor="middle">  fio json+</text>
+  <text class="mono" x="550" y="370" text-anchor="middle">cleanup ↴</text>
+  <text class="mono" x="550" y="388" text-anchor="middle">  rm testfile</text>
+
+  <!-- Layer 3: Collection -->
+  <rect class="lyr" x="700" y="60" width="180" height="240"/>
+  <text class="lyr-l" x="790" y="80" text-anchor="middle">3 · Collection</text>
+  <rect class="box" x="720" y="100" width="140" height="70"/>
+  <text class="mono" x="790" y="120" text-anchor="middle" font-weight="600">parsers/fio.py</text>
+  <text class="mono" x="790" y="142" text-anchor="middle">JSON →</text>
+  <text class="mono" x="790" y="160" text-anchor="middle">MetricRecord</text>
+
+  <ellipse class="db" cx="790" cy="240" rx="70" ry="40"/>
+  <text class="mono" x="790" y="240" text-anchor="middle" font-weight="600">store.py</text>
+  <text class="mono" x="790" y="258" text-anchor="middle">SQLite</text>
+
+  <!-- Layer 4: Reporting -->
+  <rect class="lyr" x="920" y="160" width="160" height="160"/>
+  <text class="lyr-l" x="1000" y="180" text-anchor="middle">4 · Reporting</text>
+  <rect class="box" x="940" y="200" width="120" height="100"/>
+  <text class="mono" x="1000" y="222" text-anchor="middle" font-weight="600">report.py</text>
+  <text class="mono" x="1000" y="244" text-anchor="middle">markdown</text>
+  <text class="mono" x="1000" y="262" text-anchor="middle">tables</text>
+  <text class="mono" x="1000" y="282" text-anchor="middle">wrap detect</text>
+
+  <rect class="out" x="940" y="380" width="120" height="60"/>
+  <text class="txt" x="1000" y="402" text-anchor="middle" font-weight="600">.md report</text>
+  <text class="mono" x="1000" y="422" text-anchor="middle">results/reports/</text>
+
+  <!-- Arrows -->
+  <!-- Scenario YAML -> orchestrator -->
+  <path class="arrow" d="M 180 70 Q 310 90 460 130" marker-end="url(#arr)"/>
+  <!-- Campaign YAML -> orchestrator -->
+  <path class="arrow" d="M 180 410 Q 310 360 460 175" marker-end="url(#arr)"/>
+  <!-- orchestrator <-> ssh.py -->
+  <path class="arrow" d="M 460 160 Q 420 220 400 240" marker-end="url(#arr)"/>
+  <path class="arrow" d="M 400 250 Q 420 260 460 245" marker-end="url(#arr)"/>
+  <!-- orchestrator -> runner (internal to L2) -->
+  <path class="arrow" d="M 550 190 L 550 220" marker-end="url(#arr)"/>
+  <!-- runner -> parser -->
+  <path class="arrow" d="M 640 280 Q 680 240 720 135" marker-end="url(#arr)"/>
+  <text class="lbl" x="685" y="200" text-anchor="middle">fio --output-format=json+</text>
+  <!-- parser -> store -->
+  <path class="arrow" d="M 790 170 L 790 200" marker-end="url(#arr)"/>
+  <!-- store -> report -->
+  <path class="arrow" d="M 860 240 Q 905 240 940 240" marker-end="url(#arr)"/>
+  <!-- report -> output -->
+  <path class="arrow" d="M 1000 300 L 1000 380" marker-end="url(#arr)"/>
+
+  <!-- Title -->
+  <text class="txt" x="550" y="25" text-anchor="middle" font-weight="600" font-size="15">benchmark-harness — four-layer architecture</text>
+</svg>
