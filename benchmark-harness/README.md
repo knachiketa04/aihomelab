@@ -17,40 +17,13 @@ The harness was built to support a personal AI-infrastructure storage lab; it's 
 
 Four conceptual layers, expressed as files in `harness/`:
 
-```mermaid
-flowchart LR
-    S[Scenario YAML<br/>scenarios/fio/*.yaml]
-    C[Campaign YAML<br/>your experiment]
+![benchmark-harness architecture: four layers — Automation (SSH), Execution (orchestrator + runners), Collection (parsers + SQLite), Reporting (markdown)](docs/architecture.svg)
 
-    subgraph L1[1 · Automation]
-        SSH[ssh.py<br/>run_remote · df · preflight]
-    end
+Diagram source: [docs/architecture.mmd](docs/architecture.mmd) (Mermaid, dark theme, Storage Spectrum palette). Re-render after editing:
 
-    subgraph L2[2 · Execution]
-        ORC[orchestrator.py<br/>walks Campaign]
-        RUN[runners/fio.py<br/>prepare → run_jobs → cleanup]
-    end
-
-    subgraph L3[3 · Collection]
-        PAR[parsers/fio.py<br/>JSON → metrics]
-        DB[(store.py<br/>SQLite)]
-    end
-
-    subgraph L4[4 · Reporting]
-        REP[report.py<br/>markdown tables]
-    end
-
-    S --> ORC
-    C --> ORC
-    ORC --> SSH
-    ORC --> RUN
-    RUN -- "fio --output-format=json+" --> PAR
-    PAR --> DB
-    DB --> REP
-    REP --> OUT[Markdown report]
+```bash
+npx -y @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.svg -t dark -b transparent
 ```
-
-SVG fallback for viewers that don't render Mermaid (e.g. GitHub mobile): [docs/architecture.svg](docs/architecture.svg).
 
 | Layer | Module(s) | Responsibility |
 | --- | --- | --- |

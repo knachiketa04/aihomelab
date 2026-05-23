@@ -1,0 +1,45 @@
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    classDef compute    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef hot        fill:#00C2A8,stroke:#008F7E,color:#0B1020,stroke-width:1px
+    classDef warm       fill:#F2C744,stroke:#C99B0A,color:#0B1020,stroke-width:1px
+    classDef container  fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+    classDef fabric     fill:#1E293B,stroke:#64748B,color:#F1F5F9,stroke-width:1px,stroke-dasharray: 4 3
+
+    %% Inputs (configuration / inert data → slate container)
+    S["Scenario YAML"]:::container
+    C["Campaign YAML"]:::container
+
+    %% Layer 1: Automation — network boundary to remote nodes (fabric, dashed)
+    subgraph L1["Layer 1 — Automation"]
+        SSH["ssh.py<br>run_remote · df<br>preflight_target"]:::fabric
+    end
+
+    %% Layer 2: Execution — active computation (compute violet)
+    subgraph L2["Layer 2 — Execution"]
+        ORC["orchestrator.py<br>walks Campaign<br>resume-from-crash"]:::compute
+        RUN["runners/fio.py<br>prepare → run_jobs → cleanup<br>prefill · drop_caches"]:::compute
+    end
+
+    %% Layer 3: Collection — parser (transformer / slate) feeds local hot store (teal)
+    subgraph L3["Layer 3 — Collection"]
+        PAR["parsers/fio.py<br>JSON → MetricRecord"]:::container
+        DB[("store.py<br>SQLite")]:::hot
+    end
+
+    %% Layer 4: Reporting — durable summary artifact (warm amber)
+    subgraph L4["Layer 4 — Reporting"]
+        REP["report.py<br>markdown tables<br>wrap detection"]:::warm
+    end
+
+    %% Output (final artifact → slate container)
+    OUT["Markdown report<br>results/reports/<run-id>.md"]:::container
+
+    S --> ORC
+    C --> ORC
+    ORC --> SSH
+    ORC --> RUN
+    RUN -- "fio JSON" --> PAR
+    PAR --> DB
+    DB --> REP
+    REP --> OUT
