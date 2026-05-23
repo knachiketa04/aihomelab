@@ -23,22 +23,21 @@ application_default_credentials.json
 .netrc
 
 # Experiment outputs and large/generated artifacts
-results/raw/
-results/**/*.jsonl
-results/**/*.parquet
-results/**/*.arrow
-results/**/*.safetensors
-results/**/*.pt
-results/**/*.pth
-results/**/*.ckpt
-results/**/*.bin
+# Repo-root results dir — raw benchmark output, SQLite stores, rendered reports.
+# Entirely private; curated summaries live in artifacts/, not results/.
+results/
+
+# Other large/generated artifacts at repo root
 /checkpoints/
-experiments/**/checkpoints/
-results/**/checkpoints/
 models/
 datasets/
 wandb/
 mlruns/
+
+# Python build artifacts (from benchmark-harness/ or any future Python package)
+*.egg-info/
+build/
+dist/
 
 # Python and notebook noise
 __pycache__/
