@@ -1,7 +1,5 @@
 # Storage Touch Points Across the AI Pipeline
 
-**Date:** 2026-05-23 · **Author:** Kumar Nachiketa · **Scope:** the LLM development pipeline — data prep → training / fine-tuning (with eval / validation) → inference
-
 ## TL;DR
 
 Storage shows up at distinct, predictable touch points across the LLM development pipeline. Most of the time it isn't the bottleneck — GPU or network is. But when storage *does* dominate, it dominates wall-clock more than the GPU does, and the gap between "obvious choice" and "right choice" can be 5–20×. The bill for getting it wrong is paid in **idle accelerator capacity** — the most expensive line item in any modern AI infrastructure budget.
