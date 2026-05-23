@@ -72,3 +72,7 @@ CLAUDE.md
 
 # Archived experiment writeups + planning docs — kept locally for reference, not public
 docs/archive/
+
+# Editor / tool backup files
+*.bak
+*~
