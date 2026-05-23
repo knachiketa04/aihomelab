@@ -2,6 +2,7 @@
 
 v0 commands:
   harness validate <campaign.yaml>      schema-check a campaign + its scenarios
+  harness preflight <campaign.yaml>     ssh to each node, verify capacity + path
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 
 from harness import __version__
 from harness.config import FioScenarioSpec, load_campaign, parse_size_gib
+from harness.ssh import preflight_target
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -92,6 +94,62 @@ def _print_capacity_notice(resolved: list, safety_margin_gib: int) -> None:
         click.echo("     disk demand (max testfile per target, free-space check at run time):")
         for name, gib in by_target.items():
             click.echo(f"       - {name}: {gib} GiB testfile + {safety_margin_gib} GiB margin")
+
+
+@main.command()
+@click.argument("campaign_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Don't actually SSH; just print what would be checked.",
+)
+def preflight(campaign_path: Path, dry_run: bool) -> None:
+    """SSH to each node and verify each target is reachable + has enough free space.
+
+    Aggregates the largest testfile required per target across all runs, then
+    checks ``free_space >= required + safety_margin_gib``. Reports every
+    finding, then exits non-zero if any target failed.
+    """
+    try:
+        campaign, resolved = load_campaign(campaign_path)
+    except (FileNotFoundError, ValidationError, ValueError) as e:
+        click.echo(f"[FAIL] could not load campaign: {e}", err=True)
+        sys.exit(1)
+
+    node_map = {n.name: n for n in campaign.cluster.nodes}
+
+    requirements: dict[str, int] = {}
+    for rr in resolved:
+        if isinstance(rr.scenario, FioScenarioSpec):
+            tf_gib = parse_size_gib(rr.scenario.fio_global.size)
+            requirements[rr.target.name] = max(requirements.get(rr.target.name, 0), tf_gib)
+
+    if not requirements:
+        click.echo("[OK] no targets exercised by this campaign — nothing to preflight.")
+        return
+
+    click.echo(f"Preflight for campaign {campaign.name!r}{' (dry-run)' if dry_run else ''}:")
+    findings = []
+    for target in campaign.targets:
+        if target.name not in requirements:
+            continue
+        finding = preflight_target(
+            node_map[target.node],
+            target,
+            required_gib=requirements[target.name],
+            safety_margin_gib=campaign.safety_margin_gib,
+            dry_run=dry_run,
+        )
+        findings.append(finding)
+        status = "[OK]  " if finding.ok else "[FAIL]"
+        click.echo(f"  {status} {finding.node_name}:{finding.target_name}  ({finding.path})")
+        click.echo(f"         {finding.message}")
+
+    fails = [f for f in findings if not f.ok]
+    if fails:
+        click.echo(f"\n{len(fails)} of {len(findings)} preflight check(s) failed.", err=True)
+        sys.exit(1)
+    click.echo(f"\nAll {len(findings)} preflight check(s) passed.")
 
 
 if __name__ == "__main__":

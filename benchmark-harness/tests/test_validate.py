@@ -35,6 +35,14 @@ def test_cli_validate_missing_file():
     assert result.exit_code != 0
 
 
+def test_cli_preflight_dry_run_does_not_ssh():
+    # --dry-run path: no subprocess.run call, exits 0, prints findings.
+    result = CliRunner().invoke(cli_main, ["preflight", "--dry-run", str(CAMPAIGN_OK)])
+    assert result.exit_code == 0, result.output
+    assert "[OK]" in result.output
+    assert "dry-run" in result.output
+
+
 def test_multi_thread_without_offset_rejected():
     # The 007 gotcha: numjobs>1 without offset_increment serves from drive DRAM cache.
     with pytest.raises(ValidationError):
