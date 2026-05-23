@@ -15,9 +15,9 @@ The harness was built to support a personal AI-infrastructure storage lab; it's 
 
 ## Architecture
 
-Four conceptual layers, expressed as files in `harness/`:
+The harness has one **main data flow** (left → right: inputs → execution → collection → reporting → output) and one **shared foundation** (SSH automation) called by the execution layer whenever it needs to touch a remote node:
 
-![benchmark-harness architecture: four layers — Automation (SSH), Execution (orchestrator + runners), Collection (parsers + SQLite), Reporting (markdown)](docs/architecture.svg)
+![benchmark-harness architecture: main flow Inputs → Execution → Collection → Reporting → Output, with Automation foundation called by Execution](docs/architecture.svg)
 
 Diagram source: [docs/architecture.mmd](docs/architecture.mmd) (Mermaid, dark theme, Storage Spectrum palette). Re-render after editing:
 
@@ -25,12 +25,12 @@ Diagram source: [docs/architecture.mmd](docs/architecture.mmd) (Mermaid, dark th
 npx -y @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.svg -t dark -b transparent
 ```
 
-| Layer | Module(s) | Responsibility |
+| Component | Module(s) | Responsibility |
 | --- | --- | --- |
-| 1 · Automation | `harness/ssh.py` | `ssh -o BatchMode=yes`. Sudo calls auto-add `-t`. Per-target preflight (mkdir, df). |
-| 2 · Execution | `harness/orchestrator.py`, `harness/runners/*.py` | Walk Campaign sequentially. Dispatch each scenario to the right `Runner`. Resume-from-crash via SQLite. |
-| 3 · Collection | `harness/parsers/*.py`, `harness/store.py` | Parse tool output to normalized `(scenario, job, op, metric, value)` rows. Persist in SQLite; raw outputs land in `results/raw/<run_id>/`. |
-| 4 · Reporting | `harness/report.py` | Query SQLite, render markdown via Jinja2. Spec-comparison + cross-run diff support. |
+| **Execution** | `harness/orchestrator.py`, `harness/runners/*.py` | Walk Campaign sequentially. Dispatch each scenario to the right `Runner`. Resume-from-crash via SQLite. |
+| **Collection** | `harness/parsers/*.py`, `harness/store.py` | Parse tool output to normalized `(scenario, job, op, metric, value)` rows. Persist in SQLite; raw outputs land in `results/raw/<run_id>/`. |
+| **Reporting** | `harness/report.py` | Query SQLite, render markdown via Jinja2. Spec-comparison + cross-run diff support. |
+| **Automation** (foundation, called by Execution) | `harness/ssh.py` | `ssh -o BatchMode=yes`. Sudo calls auto-add `-t`. Per-target preflight (mkdir, df). Every Execution module that touches a remote node calls into this. |
 
 ## Quick start
 
