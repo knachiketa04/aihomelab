@@ -137,7 +137,22 @@ class FioRunner(Runner):
 
         for job in scenario.jobs:
             if scenario.drop_caches_between_jobs:
-                self._drop_caches(node, ctx)
+                try:
+                    self._drop_caches(node, ctx)
+                except RemoteError as e:
+                    # Don't kill the whole campaign on a cache-drop failure;
+                    # yield a failed outcome so the orchestrator records it
+                    # and moves on. Common cause: NOPASSWD sudoers not set.
+                    yield JobOutcome(
+                        job_name=job.name,
+                        status="failed",
+                        error=(
+                            f"cache drop failed (sudo NOPASSWD likely missing for "
+                            f"sync/tee /proc/sys/vm/drop_caches): "
+                            f"{e.result.stderr.strip()[:300]}"
+                        ),
+                    )
+                    continue
 
             fio_config = render_fio_config(scenario, job, target_dir)
             remote_fio = f"/tmp/harness-{scenario.name}-{job.name}.fio"
@@ -198,12 +213,22 @@ class FioRunner(Runner):
         run_remote(node, cmd, timeout=1200)
 
     def _drop_caches(self, node: Node, ctx: RunContext) -> None:
-        # Per memory: ssh -t is mandatory for sudo on spark01/spark02.
-        run_remote_sudo(
+        # Two-step form so each sudo invocation can be whitelisted in
+        # /etc/sudoers.d/ with NOPASSWD on a specific command path. Avoids
+        # fragile sh -c quoting in sudoers rules.
+        #
+        # Required sudoers (one-time setup per node):
+        #   sparks ALL=(root) NOPASSWD: /usr/bin/sync, /usr/bin/tee /proc/sys/vm/drop_caches
+        #
+        # `sudo -n` is non-interactive: fails immediately if NOPASSWD isn't
+        # configured, instead of timing out at 60s waiting for a password
+        # prompt that has nowhere to be typed.
+        run_remote(node, "sudo -n sync", dry_run=ctx.dry_run, timeout=30)
+        run_remote(
             node,
-            "sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'",
+            "echo 3 | sudo -n tee /proc/sys/vm/drop_caches > /dev/null",
             dry_run=ctx.dry_run,
-            timeout=60,
+            timeout=30,
         )
 
     def _run_one_job(

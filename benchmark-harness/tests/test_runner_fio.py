@@ -135,7 +135,7 @@ def test_run_jobs_captures_json_and_parses_metrics(tmp_path, monkeypatch):
 
 
 def test_run_jobs_drops_caches_when_enabled(tmp_path, monkeypatch):
-    """drop_caches_between_jobs=True should produce one extra ssh call per job (sudo)."""
+    """drop_caches_between_jobs=True produces two extra ssh calls per job (sudo -n sync, sudo -n tee)."""
     captured_argvs: list[list[str]] = []
 
     def fake_run(argv, capture_output, text, timeout=None, input=None):
@@ -154,16 +154,44 @@ def test_run_jobs_drops_caches_when_enabled(tmp_path, monkeypatch):
     )
     list(FioRunner().run_jobs(scen, TARGET, NODE, ctx))
 
-    # 2 ssh invocations for 1 job: cache-drop (sudo with -t) + fio invocation.
-    assert len(captured_argvs) == 2
-    # First call is the sudo cache-drop and must include -t.
-    sudo_call = captured_argvs[0]
-    assert "-t" in sudo_call
-    assert any("drop_caches" in arg for arg in sudo_call)
-    # Second call is the fio invocation; no -t.
-    fio_call = captured_argvs[1]
-    assert "-t" not in fio_call
+    # 3 ssh invocations per job: sudo -n sync, sudo -n tee, fio.
+    assert len(captured_argvs) == 3
+    sync_call, tee_call, fio_call = captured_argvs
+    # Neither sync nor tee should request a tty: NOPASSWD means no prompt to answer.
+    assert "-t" not in sync_call
+    assert "-t" not in tee_call
+    assert "sudo -n sync" in sync_call[-1]
+    assert "sudo -n tee /proc/sys/vm/drop_caches" in tee_call[-1]
+    # fio invocation is last.
     assert any("fio --output-format=json+" in arg for arg in fio_call)
+
+
+def test_run_jobs_yields_failed_outcome_when_cache_drop_fails(tmp_path, monkeypatch):
+    """A cache-drop failure (e.g. NOPASSWD missing) yields a failed JobOutcome,
+    not an uncaught exception that would kill the whole campaign."""
+    def fake_run(argv, capture_output, text, timeout=None, input=None):
+        # Mimic `sudo -n sync` failing with the canonical NOPASSWD-missing message.
+        if "sudo -n" in argv[-1]:
+            return MagicMock(
+                returncode=1, stdout="",
+                stderr="sudo: a password is required\n",
+            )
+        return MagicMock(returncode=0, stdout=SAMPLE_JSON, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    ctx = RunContext(run_id="r1", raw_dir=tmp_path, dry_run=False)
+    scen = FioScenarioSpec(
+        kind="fio",
+        name="cache-drop-fail-test",
+        fio_global=FioGlobal(runtime=5, ramp_time=1, size="100G"),
+        jobs=[FioJob(name="j1", rw="write", bs="1M")],
+        drop_caches_between_jobs=True,
+    )
+    outcomes = list(FioRunner().run_jobs(scen, TARGET, NODE, ctx))
+    assert len(outcomes) == 1
+    assert outcomes[0].status == "failed"
+    assert "cache drop failed" in (outcomes[0].error or "")
+    assert "NOPASSWD" in (outcomes[0].error or "")
 
 
 def test_run_jobs_handles_remote_failure(tmp_path, monkeypatch):
