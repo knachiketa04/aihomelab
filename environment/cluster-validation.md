@@ -74,4 +74,21 @@ From the repo root on the workstation:
 ./infra/scripts/check-cluster-readiness.sh
 ```
 
-The script does not modify the nodes. It runs read-only checks over SSH and reports what is available.
+The script does not modify the nodes. It runs read-only checks over SSH and reports what is available. Output is two-layer: human-readable section headers for terminal use, plus structured `PROBE=<name> NODE=<node> STATUS=<ok|warn|red> DETAIL=<...>` lines that the `aihomelab-cluster-ready` skill parses. Exit code is the worst probe status (0 ok, 1 warn, 2 red).
+
+Probes (v1): `ssh_reachable`, `gpu_present`, `docker_runtime`, `gpu_docker_passthrough`, `sudoers_cache_drop`, `disk_headroom_home`, `disk_headroom_root`, `leftover_k3s`, `leftover_network_mounts`, `orphan_containers`, `stale_large_files`, `net_mgmt_peer`, `net_qsfp_peer`, `net_qsfp_bandwidth`, `hf_token`.
+
+### Agentic invocation
+
+In a Claude Code session, say "get ready for experiment" (or "cluster ready", "are the sparks up") and the `aihomelab-cluster-ready` skill runs the script directly and produces a 4-section briefing — no need to read the raw output by hand. This is the only pre-experiment exception to companion mode; the probes are read-only.
+
+### Bootstrap: install the cache-drop sudoers (one-time per node)
+
+The harness and the readiness probe both depend on a narrow-NOPASSWD `/etc/sudoers.d/sparks-cache-drop`. If `sudoers_cache_drop` comes back red because the file is missing, install it interactively:
+
+```bash
+./infra/scripts/check-cluster-readiness.sh --install-sudoers spark01
+./infra/scripts/check-cluster-readiness.sh --install-sudoers spark02
+```
+
+This uses `ssh -t` so sudo can prompt for the password on the target node. The script writes the file via a `visudo -cf` validation step, then verifies NOPASSWD callability before exiting. It is the only path that installs this sudoers entry — the readiness probe itself never attempts the install (it would need a password it doesn't have).
