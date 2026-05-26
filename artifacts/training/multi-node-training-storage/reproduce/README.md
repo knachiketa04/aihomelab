@@ -10,7 +10,7 @@ Full numbers in [`expected-output.md`](expected-output.md).
 
 ## Environment requirements
 
-- **Two UMA hosts** with a fabric pair capable of RDMA (RoCE / IB / equivalent). UMA workstations or Grace-class nodes; discrete-VRAM systems will not reproduce the memory-pressure findings — see [`scope-and-caveats.md`](../../scope-and-caveats.md).
+- **Two UMA hosts** with a fabric pair capable of RDMA (RoCE / IB / equivalent). UMA workstations or Grace-class nodes; discrete-VRAM systems will not reproduce the memory-pressure findings — see [`scope-and-caveats.md`](../../../scope-and-caveats.md).
 - ≥ 121 GiB unified memory per host.
 - ≥ 800 GB free local NVMe on the NFS-server-designated host; ≥ 200 GB on the other.
 - Docker + GPU-container runtime (NVIDIA Container Toolkit or equivalent).

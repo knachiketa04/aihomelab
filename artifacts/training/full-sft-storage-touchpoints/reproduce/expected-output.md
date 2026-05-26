@@ -67,7 +67,7 @@ $ grep "Done consolidating" c25-output.log
 
 **Ratio: step 49 / step 24 ≈ 5.8–6.3×.** Same workload, same hardware — page cache state alone explains the difference. Step 24 reads the just-written shard from page cache (hot); by step 49, intervening writes have evicted it, and the kernel must re-read from NVMe to consolidate (cold).
 
-If your ratio is significantly less than 4× or greater than 8×, your UMA-vs-checkpoint-size ratio differs enough to change the eviction breakpoint — the qualitative shape (cold > hot) holds, but the absolute multiplier is platform-specific. See [artifacts/scope-and-caveats.md](../../scope-and-caveats.md).
+If your ratio is significantly less than 4× or greater than 8×, your UMA-vs-checkpoint-size ratio differs enough to change the eviction breakpoint — the qualitative shape (cold > hot) holds, but the absolute multiplier is platform-specific. See [artifacts/scope-and-caveats.md](../../../scope-and-caveats.md).
 
 **Disk after c25:**
 

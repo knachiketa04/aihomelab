@@ -69,6 +69,8 @@ CLAUDE.md
 .claude/skills/
 .claude/agents/
 .claude/settings.local.json
+.claude/last-readiness-report.md
+.claude/last-drift-report.md
 
 # Archived experiment writeups + planning docs — kept locally for reference, not public
 docs/archive/

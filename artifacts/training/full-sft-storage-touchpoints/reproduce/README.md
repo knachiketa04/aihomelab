@@ -31,7 +31,7 @@ You need *all* of these for a faithful reproduction:
 - `iostat` (from `sysstat`) for the side-channel. The headline finding is most visible when iostat is captured alongside the run.
 - `sudo` access for `drop_caches` if you run `run-restore.sh` (the only script that needs it — see the script's pre-flight comment).
 
-If you are on a discrete-VRAM system, the memory-feasibility findings will not translate cleanly — see [artifacts/scope-and-caveats.md](../../scope-and-caveats.md).
+If you are on a discrete-VRAM system, the memory-feasibility findings will not translate cleanly — see [artifacts/scope-and-caveats.md](../../../scope-and-caveats.md).
 
 ## What's in this kit
 
