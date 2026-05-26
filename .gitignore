@@ -71,6 +71,7 @@ CLAUDE.md
 .claude/settings.local.json
 .claude/last-readiness-report.md
 .claude/last-drift-report.md
+.claude/scheduled_tasks.lock
 
 # Archived experiment writeups + planning docs — kept locally for reference, not public
 docs/archive/
