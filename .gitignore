@@ -68,6 +68,7 @@ CLAUDE.md
 .claude/publication-philosophy.md
 .claude/skills/
 .claude/agents/
+.claude/hooks/
 .claude/settings.local.json
 .claude/last-readiness-report.md
 .claude/last-drift-report.md
