@@ -25,7 +25,7 @@ The catalog grows as experiments earn their place in it (measured, framed, packa
 
 ### inference
 
-(no public experimental artifacts yet)
+- **[vllm-cold-load-loader-bound](inference/vllm-cold-load-loader-bound/vllm-cold-load-loader-bound.md)** (2026-05-31) — Why a slow vLLM cold model load on a UMA workstation is the loader's fault, not the storage tier's. The default safetensors loader is single-thread-CPU-bound: it pins one core for ~106 s while the NVMe loafs at a few percent of its bandwidth, so swapping in a streaming loader (RunAI Model Streamer or fastsafetensors) cuts cold model load 14 to 36x with no change to storage. Tier-irrelevance is loader-dependent: once the fast loader removes the CPU wall it reads near the local-NVMe ceiling, so on a slower tier the fast loaders would themselves become storage-bound.
 
 ### concepts
 
