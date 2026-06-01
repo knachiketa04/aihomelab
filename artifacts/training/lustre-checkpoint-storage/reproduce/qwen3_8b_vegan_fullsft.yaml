@@ -1,0 +1,94 @@
+# Qwen3-8B FULL-parameter SFT recipe — the checkpoint-storage A/B workload.
+#
+# This recipe exists to make the storage tier do real work: full SFT of an 8B model writes
+# ~46 GB DCP-sharded checkpoints (model ~16 GB + optimizer ~30 GB), which is what surfaces the
+# multi-client Lustre checkpoint-write behavior the kit measures. (A LoRA adapter at ~100 MB is
+# below the storage floor and saves flat in ~2 s — nothing to measure.)
+#
+# ONE recipe drives BOTH arms (single-node vs 2-node FSDP2). Only the torchrun topology and the
+# --checkpoint.checkpoint_dir override differ; the run scripts pass both at launch. The run is
+# SHORT and storage-focused, not trained to convergence: max_steps ~100, ckpt_every_steps 25 ->
+# ~4 checkpoints, set via CLI at launch.
+#
+# Container-internal paths assume the kit's mounts: dataset+tokenizer at /data (DATA_DIR), and
+# checkpoints at /checkpoints (RUN_DIR). DATA_DIR must contain train.jsonl, val.jsonl, and the
+# tokenizer dir. save_consolidated is false on purpose — see the README "consolidation path" note.
+
+step_scheduler:
+  global_batch_size: 32        # held constant across both arms (world 1 -> grad_accum 4; world 2 -> grad_accum 2)
+  local_batch_size: 2          # full SFT is memory-heavier than LoRA (~61.5 GiB plateau) -> smaller local batch
+  ckpt_every_steps: 25         # tight cadence -> successive ~46 GB writes evict the prior shard from page cache
+  val_every_steps: 50
+  num_epochs: 1                # overridden by --step_scheduler.max_steps at launch (storage run, not to convergence)
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1111
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
+  pretrained_model_name_or_path: Qwen/Qwen3-8B
+  torch_dtype: bf16
+  # no peft block -> full-parameter SFT (all ~8.2B params train)
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /checkpoints        # overridden per-arm via --checkpoint.checkpoint_dir
+  model_save_format: safetensors
+  save_consolidated: false            # DCP-sharded only. The consolidated DCP->HF path issues a page-unaligned
+                                      # buffered write that trips a known-open Lustre client defect on Hybrid-IO
+                                      # stacks; see the README "consolidation path" note. The sharded write rides
+                                      # aligned RPCs and is the multi-client Lustre-write measurement we want.
+
+distributed:
+  strategy: fsdp2
+  dp_size: none                # infer from WORLD_SIZE (1 = single-node arm, 2 = 2-node arm). Pure DP/FSDP, no pp.
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy   # answer-only masking
+
+dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  path_or_dataset_id: /data/train.jsonl
+  split: train
+  tokenizer:
+    _target_: transformers.AutoTokenizer.from_pretrained
+    pretrained_model_name_or_path: /data/qwen3-tok-nothink   # thinking-stripped Qwen3 chat template
+  seq_length: 2048
+
+packed_sequence:
+  packed_sequence_size: 0
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+  shuffle: true
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  path_or_dataset_id: /data/val.jsonl
+  split: train
+  tokenizer:
+    _target_: transformers.AutoTokenizer.from_pretrained
+    pretrained_model_name_or_path: /data/qwen3-tok-nothink
+  seq_length: 2048
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+
+optimizer:
+  _target_: torch.optim.Adam
+  betas: [0.9, 0.999]
+  eps: 1e-8
+  lr: 1.0e-5                   # full-SFT-appropriate (lower than a typical LoRA 1e-4)
+  weight_decay: 0
+  fused: true
+
+lr_scheduler:
+  lr_decay_style: cosine
+  min_lr: 1.0e-6

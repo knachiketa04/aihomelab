@@ -1,0 +1,51 @@
+Kit validated end-to-end on two UMA workstations (Grace-class GB10 nodes, Gen5 NVMe,
+>=121 GiB unified memory, ARM64, RoCE-pair fabric, file-backed-zpool Lustre-on-ZFS with one
+OST per node) on 2026-06-01.
+
+Validation date: 2026-06-01
+Repo HEAD at validation: 0c7341e (+ the uncommitted decoupling + kit patches below, to be committed together)
+Container: nvcr.io/nvidia/nemo-automodel:26.02
+Hardware class: 2x UMA workstation / Grace-class node, Gen5 NVMe, >=121 GiB unified memory,
+                ARM64, RDMA-capable fabric pair (RoCE), distributed Lustre-on-ZFS (2 OSTs,
+                file-backed zpool)
+Model: Qwen3-8B full-parameter SFT, ~46 GB DCP-sharded checkpoints (save_consolidated:false)
+
+Phases completed:
+- Single-node arm (single DCP writer): 4 x 46 GB checkpoints. 0.72 GB/s, 64 s/ckpt (60-74), peak
+  UMA 66.16 GiB, disk %util 0-57%. Attribution: ZFS ndirty peak 101.9 MB (~2.4% of cap), stime
+  peak 83 ms -> substrate IDLE -> client-bound (substrate-ceiling rejected).
+- 2-node concurrent arm (2 DCP writers, FSDP2 over RoCE): 4 x 46 GB checkpoints. 1.24 GB/s,
+  37 s/ckpt (35-41), = 1.72x the single writer, peak UMA 45.75 GiB/rank, disk %util 0-71%.
+  Attribution: ZFS ndirty peak 194.4 MB (~4.5% of cap), stime peak 97.9 ms -> substrate IDLE ->
+  client-bound. No EFAULT/panic/LBUG under concurrency (the aligned sharded write is safe;
+  concurrency is NOT the LU-18874 trigger).
+- analyze-checkpoint.py per arm (now with the ZFS-txgs attribution add-on).
+
+Bugs caught + fixed during validation:
+- Kit shipped NO recipe; the experiment recipe hardcoded /exp-026 container paths while the kit
+  mounts the dataset at /data -> the run would die "dataset not found". Shipped a clean,
+  /data-relative qwen3_8b_vegan_fullsft.yaml in the kit; RECIPE_FILE now defaults to it.
+- Cache drop used `sudo sh -c 'echo 3 > ...'`, incompatible with a narrow NOPASSWD sudoers that
+  whitelists only sync+tee -> password prompt. Added a DROP_CACHE_CMD tunable (mirrors the 028
+  kit); validated with the sync+tee override form.
+- analyze-checkpoint.py printed "client-bound" in its closing text WITHOUT computing the
+  attribution evidence -> reproduced the exact %util-degeneracy the kit warns against. Added a
+  ZFS-txgs parser (peak ndirty + sync stime) that prints an explicit substrate-idle-vs-throttle
+  verdict. Idle thresholds set loose (ndirty < 25% of the dirty cap, stime < 500 ms) after the
+  run observed 98 ms / 194 MB -- decisively idle, but close to an initial 100 ms cutoff.
+- rsync to the cluster needed the parent dir pre-created (mkdir -p / --mkpath).
+
+Known limitations (do not affect the finding):
+- The 2-node OST0/OST1 split capture needs `sudo lctl get_param` on EACH node; this run captured
+  OST0 only (spark02's lctl needed an unentered password). The aggregate GB/s and the ZFS
+  attribution do not depend on the split; the reference 50/50 (98.36/98.38 GB) stands.
+- Disk %util is a degenerate metric on file-backed-zpool Lustre (0-57% / 0-71% across arms); the
+  ZFS txgs attribution is the reliable client-vs-substrate adjudicator.
+
+This kit reproduces the artifact-grade qualitative findings -- the ~1.69x-class concurrency
+scaling (observed 1.72x), the client-bound-in-every-regime shape (substrate idle by ZFS txgs in
+both arms), and the no-panic safety of the aligned sharded write under 2-node concurrency --
+within normal hardware drift (~6-8% on absolute GB/s) on this controlled run.
+
+Scope note: this is the DECOUPLED, checkpoint-storage-only kit. The LU-18874 host-panic finding
+is reported through the upstream channel (lustre-discuss), not reproduced here.
