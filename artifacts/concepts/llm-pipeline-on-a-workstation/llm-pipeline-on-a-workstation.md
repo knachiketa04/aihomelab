@@ -405,6 +405,10 @@ Everything here is measured on two UMA workstations (Grace-class GB10), ARM64 Li
 - [Checkpoint storage on Lustre is client-bound, not substrate-bound](../../training/lustre-checkpoint-storage/): the full-SFT stage, with the attribution probe.
 - [vLLM cold model load is loader-bound, not storage-bound](../../inference/vllm-cold-load-loader-bound/): the serving stage, the loader A/B/C.
 
+**Reproduce the whole pipeline:**
+
+- [The end-to-end reproduce kit](reproduce/): the as-run scripts for every stage (ingest and clean, synthetic generation, LoRA and full-SFT fine-tune, eval, serve), with a run guide. The two storage A/Bs above ship as their own validated kits inside it.
+
 **Companion framing (the theory this article puts into practice):**
 
 - [Storage touch points across the AI pipeline](../storage-touchpoints-map/storage-touchpoints-map.md): the first-principles map of where storage shows up at each stage, when it dominates, and when it does not, anchored to industry references. This article is the functional, end-to-end walk of that map.

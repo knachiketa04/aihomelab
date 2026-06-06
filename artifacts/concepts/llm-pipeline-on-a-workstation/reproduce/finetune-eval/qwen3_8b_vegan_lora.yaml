@@ -1,0 +1,96 @@
+# Qwen3-8B LoRA SFT on the vegan/vegetarian recipe instruction set.
+#
+# Derived from the shipped container recipes (nvcr.io/nvidia/nemo-automodel:26.02):
+#   - qwen3_8b_squad_spark.yaml          -> overall structure (rng, FSDP2, step_scheduler, optimizer, lr_scheduler)
+#   - qwen3_8b_hellaswag_pp_peft.yaml    -> peft block + checkpoint block shape (match_all_linear, use_triton:false)
+#   - qwen2_5_32b_peft_benchmark_2nodes  -> confirms peft + checkpoint.checkpoint_dir field names
+#
+# ONE recipe drives BOTH arms of the storage A/B. Only the torchrun topology
+# (world_size 1 = single-node; 2 = two-node FSDP2) and the --checkpoint.checkpoint_dir CLI
+# override change between arms. Everything else (GBS, seed, steps, LoRA config) is held constant.
+#
+# Container-internal paths assume the dataset + tokenizer are mounted at /data (see lora_singlenode.sh).
+
+step_scheduler:
+  global_batch_size: 32        # HELD CONSTANT across arms.  GBS = local_batch x world_size x grad_accum
+  local_batch_size: 8          #   single-node (world 1): 8 x 1 x 4 = 32  |  two-node (world 2): 8 x 2 x 2 = 32
+  ckpt_every_steps: 150        # ~4 checkpoints over ~650 steps (10,424 / 32 x 2 epochs) -> exercises the checkpoint-save cadence
+  val_every_steps: 75
+  num_epochs: 2
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1111
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
+  pretrained_model_name_or_path: Qwen/Qwen3-8B
+  torch_dtype: bf16
+
+peft:
+  _target_: nemo_automodel.components._peft.lora.PeftConfig
+  match_all_linear: true       # shipped-recipe convention: all Linear layers (= q/k/v/o/gate/up/down_proj)
+  dim: 16                      # LoRA rank (tunable; NOT load-bearing for the storage A/B)
+  alpha: 32
+  use_triton: false            # aarch64-safe (the shipped 8B peft recipe uses false)
+
+checkpoint:
+  enabled: true                # checkpoint save and deploy-export are core measurements -> ON (shipped benchmarks ship this OFF)
+  checkpoint_dir: /ckpt/single-node   # OVERRIDDEN per-arm via --checkpoint.checkpoint_dir
+  model_save_format: safetensors
+  save_consolidated: true      # consolidated safetensors adapter -> the deploy-export artifact
+
+distributed:
+  strategy: fsdp2
+  dp_size: none                # infer from WORLD_SIZE (1 = single-node, 2 = two-node). NO pp_size -- pure DP/FSDP.
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy   # answer-only masking (PEFT convention)
+
+dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  path_or_dataset_id: /data/train.jsonl
+  split: train                 # for a local .jsonl this reads the whole file; verify row count at smoke test
+  tokenizer:
+    _target_: transformers.AutoTokenizer.from_pretrained
+    pretrained_model_name_or_path: /data/qwen3-tok-nothink   # thinking-stripped Qwen3 template (see gen_nothink_tokenizer.py)
+  seq_length: 2048
+  # SMOKE-TEST: confirm NO <think> block renders -- Qwen3 thinking defaults ON.
+  # If ChatDataset exposes enable_thinking / chat_template / mask_reasoning_content, set thinking OFF here.
+
+packed_sequence:
+  packed_sequence_size: 0      # no packing (short examples; keeps per-arm token counts identical)
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+  shuffle: true
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  path_or_dataset_id: /data/val.jsonl
+  split: train
+  tokenizer:
+    _target_: transformers.AutoTokenizer.from_pretrained
+    pretrained_model_name_or_path: /data/qwen3-tok-nothink   # thinking-stripped Qwen3 template (see gen_nothink_tokenizer.py)
+  seq_length: 2048
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+
+optimizer:
+  _target_: torch.optim.Adam
+  betas: [0.9, 0.999]
+  eps: 1e-8
+  lr: 1.0e-4                   # LoRA-appropriate (full-SFT recipe used 1e-5); tunable
+  weight_decay: 0
+  fused: true                  # if fused Adam errors on aarch64, drop this line
+
+lr_scheduler:
+  lr_decay_style: cosine
+  min_lr: 1.0e-5
