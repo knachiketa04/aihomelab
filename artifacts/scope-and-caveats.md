@@ -6,7 +6,7 @@ Findings in `artifacts/` are measured on a specific platform with specific softw
 
 **DGX Spark UMA (no discrete VRAM).** Both lab nodes use NVIDIA's GB10 Grace Blackwell platform with unified memory shared between CPU and GPU. The OOM ceiling is total anonymous-RSS against a single physical pool, not "GPU memory full." Findings about memory feasibility (e.g. "8B full SFT fits comfortably") translate to other UMA platforms (Apple Silicon, AMD MI300A, future Grace-class systems) but **do not translate cleanly** to discrete-VRAM systems where CPU and GPU memory are separate budgets.
 
-**Single-node measurements.** Every experiment to date runs on one Spark node. Multi-node behavior (FSDP sharding, RoCE-fabric checkpoint writes, all-reduce overhead) is not measured here and should not be inferred from per-node findings.
+**Single-node and two-node measurements.** Most experiments run on one Spark node. A subset run across both nodes: distributed Lustre and NFSoRDMA shared filesystems, RoCE-fabric checkpoint writes, and FSDP2 cross-node sharding. Those are called out as two-node in the artifacts that report them. The lab has two nodes total, so every finding is measured at one-node or two-node scale; behavior at larger node counts (all-reduce overhead beyond two ranks, multi-rail fabrics, rack-scale storage) is not measured and should not be inferred from one- or two-node findings.
 
 **ARM64 Ubuntu host.** DGX Spark runs an ARM64 Linux distribution. Container images, Python wheels, and CUDA builds all need ARM64 variants. Findings about container pull time, image size, or wheel-install behavior may differ on x86_64.
 
@@ -22,7 +22,7 @@ Findings in `artifacts/` are measured on a specific platform with specific softw
 
 **Experiments are observational, not controlled trials.** The lab measures what happens under realistic configurations rather than ablating one variable at a time. When a result claims a causal relationship (e.g. "page cache state is the dominant variable in checkpoint write wall-clock"), it is supported by side-channel evidence (iostat) and a plausible mechanism, but it is not a randomized comparison.
 
-**Single-node runs do not generalize linearly.** A finding measured on one node should not be multiplied by N to predict an N-node cluster. Networking, scheduling, and storage-tier sharing introduce non-linear effects.
+**Small-cluster runs do not generalize linearly.** A finding measured at one or two nodes should not be multiplied by N to predict an N-node cluster. Networking, scheduling, and storage-tier sharing introduce non-linear effects. The two-node concurrency results in particular (for example, checkpoint writer scaling) are an early point on a curve, not a slope to extend.
 
 **Cold vs warm runs are reported separately.** Where a measurement is sensitive to page cache state, both cold and warm numbers are given; readers should match their planning case (steady-state vs first-run) to the appropriate column.
 

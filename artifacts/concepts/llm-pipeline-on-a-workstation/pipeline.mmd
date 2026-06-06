@@ -1,0 +1,42 @@
+%%{init: {'theme':'dark'}}%%
+flowchart TB
+    classDef app      fill:#3FA9F5,stroke:#1E7BC0,color:#0B1020,stroke-width:1px
+    classDef mem      fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef cpu      fill:#F2C744,stroke:#C99B0A,color:#0B1020,stroke-width:1px
+    classDef client   fill:#FF6B6B,stroke:#C13A3A,color:#0B1020,stroke-width:1px
+    classDef store    fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+    classDef user     fill:#1E293B,stroke:#64748B,color:#F1F5F9,stroke-width:1px
+    classDef phase    fill:#0F172A,stroke:#475569,color:#F1F5F9,stroke-width:2px
+
+    Cook["Home cook<br/>plain-English request (&lt;1 KB)"]:::user
+
+    subgraph PREP["<b>Prep</b>"]
+        direction LR
+        Src["Public sources<br/>Wikibooks · Gutenberg · Wikipedia"]:::user
+        Prep["<b>Data prep</b> · ingest + 3-pass clean<br/>bottleneck: application-layer ETL"]:::app
+        Gen["<b>Synthetic gen</b> · Qwen3-32B teacher<br/>bottleneck: GPU memory bandwidth"]:::mem
+    end
+
+    subgraph TRAIN["<b>Train</b>"]
+        direction LR
+        Tune["<b>Fine-tune</b> · Qwen3-8B (LoRA + full-SFT)<br/>bottleneck: writer concurrency"]:::client
+        Eval["<b>Eval</b> · regex screen + LLM judge<br/>bottleneck: data quality"]:::app
+    end
+
+    subgraph SERVE["<b>Serve</b>"]
+        Serve["<b>Serve</b> · vLLM, fine-tuned Qwen3-8B<br/>bottleneck: single-thread CPU loader<br/>cold load 106s, 3s after loader swap"]:::cpu
+    end
+
+    Recipe["Recipe returned<br/>~269 tokens / request"]:::user
+    Lustre[("Shared storage · Lustre-on-ZFS<br/><i>idle in every stage at this scale</i>")]:::store
+
+    Src -->|"12.8 MiB raw"| Prep -->|"corpus 3.5 + 9.4 MiB"| Gen -->|"~38 MiB · 12,368 rows"| Tune
+    Tune -->|"46 GB checkpoints / 97 MB adapter"| Eval
+    Tune -->|"88 MB served weights"| Serve
+    Cook --> Serve --> Recipe
+    Prep -.-> Lustre
+    Gen -.-> Lustre
+    Tune -.-> Lustre
+    Eval -.-> Lustre
+
+    class PREP,TRAIN,SERVE phase

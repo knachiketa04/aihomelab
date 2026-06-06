@@ -30,6 +30,7 @@ The catalog grows as experiments earn their place in it (measured, framed, packa
 ### concepts
 
 - **[storage-touchpoints-map](concepts/storage-touchpoints-map/storage-touchpoints-map.md)** (2026-06-06, revised from 2026-05-27) — a storage practitioner's first-principles map of the LLM development pipeline (data prep → training → inference), enumerating where storage shows up at each stage, when it dominates, and when it doesn't. Anchored to four industry-standard references (MLPerf Storage, NVIDIA DGX SuperPOD, Google Cloud AI/ML storage architecture, NVIDIA GPU Direct Storage) and to the lab's measured experimental artifacts.
+- **[llm-pipeline-on-a-workstation](concepts/llm-pipeline-on-a-workstation/llm-pipeline-on-a-workstation.md)** (2026-06-07) — an end-to-end LLM pipeline built and measured on a two-node DGX Spark home lab (data prep → teacher-student distillation → fine-tune → eval → serve), walking each stage's real storage I/O behavior, the layer the bottleneck actually lived in, and qualitative projections to where storage flips to the constraint at enterprise scale. The functional, end-to-end companion to storage-touchpoints-map (theory put into practice).
 
 ---
 

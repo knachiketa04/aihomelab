@@ -1,0 +1,14 @@
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    classDef app    fill:#3FA9F5,stroke:#1E7BC0,color:#0B1020,stroke-width:1px
+    classDef store  fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+    classDef user   fill:#1E293B,stroke:#64748B,color:#F1F5F9,stroke-width:1px
+
+    Prompts["579 held-out prompts<br/>concurrency 64"]:::user
+    Server["live server · fine-tuned Qwen3-8B<br/>prefix 83% · KV peak 5.5%"]:::user
+    Regex["<b>regex screen</b><br/>trips on 'replace the fish with tofu'"]:::app
+    Judge["<b>LLM judge</b><br/>tells a violation from a substitution"]:::app
+    Audit[("audit log · Lustre<br/>4 KB/s")]:::store
+
+    Prompts --> Server --> Regex --> Judge
+    Server -.->|"audit write"| Audit

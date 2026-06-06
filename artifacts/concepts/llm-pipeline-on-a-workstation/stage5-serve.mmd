@@ -1,0 +1,14 @@
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    classDef cpu     fill:#F2C744,stroke:#C99B0A,color:#0B1020,stroke-width:1px
+    classDef mem     fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef neutral fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+    classDef user    fill:#1E293B,stroke:#64748B,color:#F1F5F9,stroke-width:1px
+
+    Cold["<b>1. Cold load</b> (once per server)<br/>default 106 s · fastsafetensors 6 s · runai 3 s<br/>1 core pinned, 19 idle · NVMe ~0.5 GB/s"]:::cpu
+    Arrive["<b>2. Arrival</b><br/>tokenize · ~ms"]:::neutral
+    Prefill["<b>3. Prefill</b><br/>~100s ms · compute"]:::mem
+    Decode["<b>4. Decode</b><br/>per-token weight read<br/>the steady-state cost"]:::mem
+    Resp["<b>5. Response</b><br/>~269 tokens"]:::user
+
+    Cold --> Arrive --> Prefill --> Decode --> Resp

@@ -1,0 +1,18 @@
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    classDef mem    fill:#7C5CFF,stroke:#5B3DD9,color:#F1F5F9,stroke-width:1px
+    classDef store  fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+
+    Ground[("grounding corpus<br/>on Lustre")]:::store
+    subgraph Teacher["Teacher: Qwen3-32B · data-parallel across 2 nodes"]
+      T1["spark01 · vLLM"]:::mem
+      T2["spark02 · vLLM"]:::mem
+    end
+    Decode["<b>per-token decode</b><br/>reads 61 GiB weights every token<br/>ceiling: 65.5 GB / 273 GB/s ≈ 0.24 s/token (derived)<br/>prefix cache 94%"]:::mem
+    Out[("synthetic JSONL<br/>12,368 rows · ~38 MiB<br/>write ~3 KB/s")]:::store
+
+    Ground --> T1
+    Ground --> T2
+    T1 --> Decode
+    T2 --> Decode
+    Decode --> Out

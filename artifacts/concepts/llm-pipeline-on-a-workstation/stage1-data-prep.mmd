@@ -1,0 +1,22 @@
+%%{init: {'theme':'dark'}}%%
+flowchart LR
+    classDef app    fill:#3FA9F5,stroke:#1E7BC0,color:#0B1020,stroke-width:1px
+    classDef store  fill:#94A3B8,stroke:#64748B,color:#0B1020,stroke-width:1px
+    classDef user   fill:#1E293B,stroke:#64748B,color:#F1F5F9,stroke-width:1px
+
+    WB["Wikibooks Cookbook"]:::user
+    GB["Project Gutenberg"]:::user
+    WP["Wikipedia food articles"]:::user
+    Land[("landing tier · Lustre<br/>disk at 3% capacity")]:::store
+    P1["<b>Pass 1</b><br/>schema unify"]:::app
+    P2["<b>Pass 2</b><br/>vegan/veg classify<br/>(rule-based)"]:::app
+    P3["<b>Pass 3</b><br/>MinHash dedup + split"]:::app
+    Diet[("diet corpus<br/>2,399 rows · 3.5 MiB")]:::store
+    Ground[("grounding corpus<br/>4,102 rows · 9.37 MiB")]:::store
+
+    WB --> Land
+    GB --> Land
+    WP --> Land
+    Land -->|"12.8 MiB raw"| P1 -->|"8.66 MiB"| P2 -->|"9.37 MiB"| P3
+    P3 --> Diet
+    P3 --> Ground
