@@ -30,6 +30,8 @@ Along the way the pipeline uses the things you would expect a modern LLM stack t
 
 **Who this is for.** If you work in infrastructure (storage, network, compute) and you are being pulled toward AI work, this is a tour of where the bottlenecks actually live in an LLM pipeline, measured rather than assumed. The going-in instinct for someone with my background is to suspect storage. The interesting part is watching, stage by stage, where that instinct is right, where it is wrong, and what would have to change for it to flip. There is a deeper reason this is easy to get wrong: across a lot of use cases, even sophisticated ones, you do not hit a storage bottleneck in the early or proof-of-concept stage at all. A modestly sized cloud box on default settings does the job, and storage never enters the conversation. I built a complete teacher-student distillation pipeline from a raw corpus of just 12.8 MiB; at that size a default machine handles every stage and storage stays invisible. That invisibility is the trap: it is why storage gets left out of the plan entirely, right up to the scale where it stops being optional. Each stage ends with an enterprise-scale aside for the reader who cares about the large version of the same problem.
 
+> **Try it on your own DGX Spark.** The whole pipeline ships as an [end-to-end reproduce kit](reproduce/): the as-run scripts for every stage (ingest and clean, synthetic generation, fine-tune, eval, serve) plus a run guide. Paths and hosts are parameterized, so it adapts to other hardware too.
+
 ---
 
 ## The pipeline at a glance
