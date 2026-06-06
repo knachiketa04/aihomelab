@@ -80,3 +80,6 @@ docs/archive/
 # Editor / tool backup files
 *.bak
 *~
+
+# private career kit (never push)
+career-kit/
