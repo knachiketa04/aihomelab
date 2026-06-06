@@ -7,7 +7,7 @@ flowchart LR
 
     UPSTREAM["<b>Upstream sources</b><br>web crawls, partner feeds,<br>customer logs, prior pipelines"]:::fabric
 
-    subgraph OBJ["<b>Object storage (durable foundation)</b> — raw + intermediate + final zones"]
+    subgraph OBJ["<b>Object storage (durable foundation)</b>: raw + intermediate + final zones"]
         direction TB
         Z1["raw zone"]:::storage
         Z2["cleaned zone"]:::storage
@@ -17,7 +17,7 @@ flowchart LR
         Z6["sharded zone"]:::storage
     end
 
-    subgraph WORKERS["<b>Distributed transformation</b> — Spark / Ray / Beam / Flink"]
+    subgraph WORKERS["<b>Distributed transformation</b>: Spark / Ray / Beam / Flink"]
         direction TB
         W1["clean + filter"]:::compute
         W2["enrich + label"]:::compute

@@ -8,14 +8,14 @@ flowchart TB
 
     REG["<b>Source tier</b><br>weights registry,<br>dataset object store"]:::fabric
 
-    subgraph TIER["<b>Training-fast tier</b> — parallel FS / local NVMe / shared FS"]
+    subgraph TIER["<b>Training-fast tier</b>: parallel FS / local NVMe / shared FS"]
         direction LR
         DS["dataset shards"]:::storage
         CKPT["checkpoint store<br>DCP + consolidated"]:::storage
         EXP["deploy-format export"]:::storage
     end
 
-    subgraph COMPUTE["<b>Compute memory</b> — UMA / GPU + host RAM"]
+    subgraph COMPUTE["<b>Compute memory</b>: UMA / GPU + host RAM"]
         direction LR
         MODEL["model weights"]:::memory
         OPT["optimizer state"]:::memory

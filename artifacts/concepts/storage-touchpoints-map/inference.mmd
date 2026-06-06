@@ -10,13 +10,13 @@ flowchart TB
 
     REG["<b>Model registry</b><br>object store +<br>versioning"]:::storage
 
-    subgraph SERVING["<b>Serving pod</b> — vLLM / SGLang runtime"]
+    subgraph SERVING["<b>Serving pod</b>: vLLM / SGLang runtime"]
         direction TB
         LOADER["<b>TP1 cold start</b><br>loader (RunAI Streamer /<br>fastsafetensors / tensorizer)"]:::compute
         WEIGHTS["model weights in<br>compute memory"]:::memory
     end
 
-    subgraph KVTIER["<b>TP2/TP3 KV cache hierarchy</b> — read on hit, recompute on miss"]
+    subgraph KVTIER["<b>TP2/TP3 KV cache hierarchy</b>: read on hit, recompute on miss"]
         direction TB
         K1["GPU memory<br>fastest · smallest"]:::memory
         K2["CPU RAM<br>host-memory tier"]:::memory
