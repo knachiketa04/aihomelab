@@ -32,7 +32,7 @@ flowchart TB
 
     Src -->|"12.8 MiB raw"| Prep -->|"corpus 3.5 + 9.4 MiB"| Gen -->|"~38 MiB · 12,368 rows"| Tune
     Tune -->|"46 GB checkpoints / 97 MB adapter"| Eval
-    Tune -->|"88 MB served weights"| Serve
+    Tune -->|"~87 MB published adapter"| Serve
     Cook --> Serve --> Recipe
     Prep -.-> Lustre
     Gen -.-> Lustre

@@ -14,6 +14,8 @@ Three kinds of artifacts live here:
 
 The catalog grows as experiments earn their place in it (measured, framed, packaged for someone else to repeat) and as concept artifacts cover patterns that emerge across multiple experiments.
 
+**End-to-end pipeline (one project across five artifacts).** The vegan-recipe pipeline runs as a single body of work: data prep → the [released dataset](datasets/vegan-vegetarian-recipes-qa/README.md) → fine-tune (the [released model](models/vegetarian-recipe-qwen3-8b-lora/README.md) plus the [checkpoint-storage measurement](training/lustre-checkpoint-storage/lustre-checkpoint-storage.md)) → serve (the [vLLM cold-load measurement](inference/vllm-cold-load-loader-bound/vllm-cold-load-loader-bound.md)). It is walked end to end, stage by stage, in the [LLM pipeline on a workstation](concepts/llm-pipeline-on-a-workstation/llm-pipeline-on-a-workstation.md) concept.
+
 ## Catalog
 
 ### training

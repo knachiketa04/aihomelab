@@ -4,6 +4,8 @@
 
 > Findings are measured on UMA workstations (Grace-class), two-node, ARM64 Linux, over a distributed Lustre-on-ZFS filesystem with a file-backed zpool per OST, using the software versions above. See [artifacts/scope-and-caveats.md](../../scope-and-caveats.md) for what bounds how this generalizes.
 
+*Part of an end-to-end pipeline: this is the full-SFT checkpoint stage of the [LLM pipeline on a workstation](../../concepts/llm-pipeline-on-a-workstation/llm-pipeline-on-a-workstation.md) walk.*
+
 ## Findings
 
 1. **Full-SFT checkpoint storage is client-bound in every regime: single write, concurrent write, and restore read.** A single sharded writer lands ~0.78 GB/s; two concurrent writers land 1.32 GB/s; a single-client restore read lands 1.37 GB/s. In all three, the local NVMe sits under 55% busy on writes and around 20% on reads. The lever for faster checkpoints on this class is writer concurrency and client latency, not a faster storage tier.

@@ -76,7 +76,7 @@ flowchart TB
 
     Src -->|"12.8 MiB raw"| Prep -->|"corpus 3.5 + 9.4 MiB"| Gen -->|"~38 MiB · 12,368 rows"| Tune
     Tune -->|"46 GB checkpoints / 97 MB adapter"| Eval
-    Tune -->|"88 MB served weights"| Serve
+    Tune -->|"~87 MB published adapter"| Serve
     Cook --> Serve --> Recipe
     Prep -.-> Lustre
     Gen -.-> Lustre
@@ -205,6 +205,8 @@ That 0.24 is a derived ceiling, the fastest a single stream could possibly decod
 
 **Where the bottleneck actually was:** not storage, on two counts. The cold-load read rate is two orders of magnitude below what the NVMe can do, and it does not change with cache state, so the load is CPU-bound deserialization, not disk. And generation itself is bounded by that 273 GB/s memory wall. There was also a third, harder ceiling: on this UMA hardware, the GPU allocator accumulated pressure across dozens of model reloads and eventually wedged the node, which is what capped the run at ~12,000 rows. That is a reliability limit, not a storage or throughput one, and it is its own story.
 
+**What the dataset became.** Those 12,368 raw generations cleaned down to 11,582 released instruction pairs after parsing, formatting, and dedup, split 10,424 train / 579 validation / 579 test. That train split is the ~10.4K rows the fine-tune stage reads in the next section.
+
 **Where storage flips:** it does not, on the generation path. A bigger teacher loads linearly slower per GiB regardless of storage tier (it is CPU-bound), and generation is bandwidth-bound, so a faster disk buys nothing here at any model size. **[The cold/warm 3% spread is measured; the memory-bandwidth ceiling is derived arithmetic the run never reached, because the allocator wedged first.]**
 
 > **At enterprise scale.** Generation at home loads the teacher once and trickles the output. Training or generating against a large corpus changes which touch points matter. The dataset stream becomes a continuous, sustained sequential read rather than a one-time load, and batch size turns into a first-order storage parameter, because the loader has to keep every accelerator fed without stalling. This is the training-read touch point doing real work, and it is one of the regimes where a slow or mis-sized data tier shows up directly as idle accelerators, the most expensive thing in the building.
@@ -248,7 +250,7 @@ To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i stage3-fine-tune.
 
 ### Arm A — LoRA: checkpoints too small to see
 
-LoRA trains a small low-rank adapter instead of the whole model, so what you save is tiny. Each adapter checkpoint was **97 MB**, written flat in **1 to 3 seconds**, and it stayed resident in the page cache (no cold re-read penalty). Across a 70-minute run, checkpoint writes were about 12 seconds of 4,200. The save is below the floor where storage behavior is even observable. The real cost was compute: roughly 5.7 seconds per training step.
+LoRA trains a small low-rank adapter instead of the whole model, so what you save is tiny. Each adapter checkpoint was **97 MB**, written flat in **1 to 3 seconds**, and it stayed resident in the page cache (no cold re-read penalty). The published adapter is a bit smaller, about 87 MB, after the `lm_head` LoRA pair is stripped so vLLM will load it. Across a 70-minute run, checkpoint writes were about 12 seconds of 4,200. The save is below the floor where storage behavior is even observable. The real cost was compute: roughly 5.7 seconds per training step.
 
 ### Arm B — Full-parameter SFT: the richest storage data in the whole pipeline
 
@@ -409,7 +411,7 @@ Everything here is measured on two UMA workstations (Grace-class GB10), ARM64 Li
 
 **The dataset and model this pipeline produced:**
 
-- [The vegan and vegetarian recipe Q&A dataset](../../datasets/vegan-vegetarian-recipes-qa/README.md): the 11,582-pair instruction set the teacher generated, also on [Hugging Face](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa).
+- [The vegan and vegetarian recipe Q&A dataset](../../datasets/vegan-vegetarian-recipes-qa/README.md): the 11,582-pair released instruction set distilled from the teacher, also on [Hugging Face](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa).
 - [The Qwen3-8B LoRA adapter](../../models/vegetarian-recipe-qwen3-8b-lora/README.md): the fine-tuned student, served adapter-on-base, also on [Hugging Face](https://huggingface.co/knachiketa004/vegetarian-recipe-qwen3-8b-lora).
 
 **Reproduce the whole pipeline:**

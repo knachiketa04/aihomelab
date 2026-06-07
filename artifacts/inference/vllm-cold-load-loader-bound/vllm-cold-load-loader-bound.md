@@ -4,6 +4,8 @@
 
 > Measured on a single UMA workstation (Grace-class node), ARM64, single Gen5 NVMe, no GPUDirect Storage, with the software versions above. See [artifacts/scope-and-caveats.md](../../scope-and-caveats.md) for what bounds how this generalizes.
 
+*Part of an end-to-end pipeline: this is the serving / cold-load stage of the [LLM pipeline on a workstation](../../concepts/llm-pipeline-on-a-workstation/llm-pipeline-on-a-workstation.md) walk.*
+
 ## Findings
 
 1. **The default vLLM loader is single-thread-CPU-bound, and swapping it cuts cold load 14 to 36x.** Cold-loading a base 8B model (15.27 GiB of safetensors) takes about 106 seconds with the stock `auto` loader, about 6 seconds with fastsafetensors, and about 3 seconds with RunAI Model Streamer, all serving byte-identical output. The storage tier never changes across the three; only the `--load-format` does.
