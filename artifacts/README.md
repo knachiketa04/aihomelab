@@ -1,6 +1,6 @@
 # Artifacts
 
-Two kinds of artifacts live here:
+Three kinds of artifacts live here:
 
 - **Experimental artifacts** — measurement-driven write-ups, each paired with a reproducible kit you can run on similar hardware. Organized by AI pipeline stage:
   - **`data-prep/`** — dataset ingest, transformation, tokenization, cache behavior.
@@ -8,6 +8,9 @@ Two kinds of artifacts live here:
   - **`inference/`** — model loading, serving startup, model cache, runtime behavior.
 - **Concept artifacts** — framing-and-explanation guides written from a storage practitioner's lens, anchored to industry-standard references and to the experimental artifacts above. No reproduce kit; the structural integrity comes from anchoring discipline (every framing either links to a measurement or carries a *descriptive only* tag).
   - **`concepts/`** — pipeline maps, storage decision frameworks, cross-stage patterns.
+- **Published assets** — datasets and model adapters released to the community on Hugging Face. The card here mirrors the live repo; the actual data and weights live on the Hub and the cluster, never in Git.
+  - **`datasets/`** — released instruction-tuning datasets.
+  - **`models/`** — released fine-tuned model adapters.
 
 The catalog grows as experiments earn their place in it (measured, framed, packaged for someone else to repeat) and as concept artifacts cover patterns that emerge across multiple experiments.
 
@@ -31,6 +34,14 @@ The catalog grows as experiments earn their place in it (measured, framed, packa
 
 - **[storage-touchpoints-map](concepts/storage-touchpoints-map/storage-touchpoints-map.md)** (2026-06-06, revised from 2026-05-27) — a storage practitioner's first-principles map of the LLM development pipeline (data prep → training → inference), enumerating where storage shows up at each stage, when it dominates, and when it doesn't. Anchored to four industry-standard references (MLPerf Storage, NVIDIA DGX SuperPOD, Google Cloud AI/ML storage architecture, NVIDIA GPU Direct Storage) and to the lab's measured experimental artifacts.
 - **[llm-pipeline-on-a-workstation](concepts/llm-pipeline-on-a-workstation/llm-pipeline-on-a-workstation.md)** (2026-06-07) — an end-to-end LLM pipeline built and measured on a two-node DGX Spark home lab (data prep → teacher-student distillation → fine-tune → eval → serve), walking each stage's real storage I/O behavior, the layer the bottleneck actually lived in, and qualitative projections to where storage flips to the constraint at enterprise scale. The functional, end-to-end companion to storage-touchpoints-map (theory put into practice).
+
+### datasets
+
+- **[vegan-vegetarian-recipes-qa](datasets/vegan-vegetarian-recipes-qa/README.md)** (2026-06-07) — an 11,582-pair synthetic vegan and vegetarian recipe Q&A instruction set, distilled from a Qwen3-32B teacher; the data stage of the end-to-end pipeline. The card is honest about the keyword dietary-screen's heavy over-flagging (~14% of rows flagged, dominated by correct-substitution false positives, and kept on purpose) and about the templated train/test prompt overlap. CC BY-SA 4.0. Published at [huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa).
+
+### models
+
+- **[vegetarian-recipe-qwen3-8b-lora](models/vegetarian-recipe-qwen3-8b-lora/README.md)** (2026-06-07) — a Qwen3-8B LoRA adapter for vegan and vegetarian recipe Q&A; the fine-tune stage of the pipeline. Served adapter-on-base (the `lm_head` LoRA pair is stripped so vLLM accepts it), with honest limits: dietary slips in 2 of 5 samples versus 4 of 5 for the un-fine-tuned base, plus a dish-naming tic. Apache-2.0. Published at [huggingface.co/knachiketa004/vegetarian-recipe-qwen3-8b-lora](https://huggingface.co/knachiketa004/vegetarian-recipe-qwen3-8b-lora).
 
 ---
 

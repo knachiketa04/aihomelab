@@ -29,10 +29,21 @@ results/
 
 # Other large/generated artifacts at repo root
 /checkpoints/
-models/
-datasets/
+/models/
+/datasets/
 wandb/
 mlruns/
+
+# Public artifact cards under artifacts/datasets|models/ ARE tracked (markdown only).
+# The actual datasets and model weights live on Hugging Face + the cluster, never in Git:
+artifacts/datasets/**/*.jsonl
+artifacts/datasets/**/*.parquet
+artifacts/datasets/**/*.arrow
+artifacts/datasets/**/*.csv
+artifacts/models/**/*.safetensors
+artifacts/models/**/*.bin
+artifacts/models/**/*.gguf
+artifacts/models/**/*.pt
 
 # Python build artifacts (from benchmark-harness/ or any future Python package)
 *.egg-info/
