@@ -407,6 +407,11 @@ Everything here is measured on two UMA workstations (Grace-class GB10), ARM64 Li
 - [Checkpoint storage on Lustre is client-bound, not substrate-bound](../../training/lustre-checkpoint-storage/): the full-SFT stage, with the attribution probe.
 - [vLLM cold model load is loader-bound, not storage-bound](../../inference/vllm-cold-load-loader-bound/): the serving stage, the loader A/B/C.
 
+**The dataset and model this pipeline produced:**
+
+- [The vegan and vegetarian recipe Q&A dataset](../../datasets/vegan-vegetarian-recipes-qa/README.md): the 11,582-pair instruction set the teacher generated, also on [Hugging Face](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa).
+- [The Qwen3-8B LoRA adapter](../../models/vegetarian-recipe-qwen3-8b-lora/README.md): the fine-tuned student, served adapter-on-base, also on [Hugging Face](https://huggingface.co/knachiketa004/vegetarian-recipe-qwen3-8b-lora).
+
 **Reproduce the whole pipeline:**
 
 - [The end-to-end reproduce kit](reproduce/): the as-run scripts for every stage (ingest and clean, synthetic generation, LoRA and full-SFT fine-tune, eval, serve), with a run guide. The two storage A/Bs above ship as their own validated kits inside it.
@@ -424,6 +429,6 @@ Everything here is measured on two UMA workstations (Grace-class GB10), ARM64 Li
 
 **Companion reading:**
 
-- The economics of generating this dataset (cost across personal hardware, rented GPUs, and APIs) and the dataset card travel as separate companion pieces.
+- The economics of generating this dataset (cost across personal hardware, rented GPUs, and APIs) travels as a separate companion piece.
 
 **Foundations:** Kwon et al., [*Efficient Memory Management for LLM Serving with PagedAttention*](https://arxiv.org/abs/2309.06180) (the vLLM paper); the [MLPerf Storage benchmark](https://mlcommons.org/benchmarks/storage/); [NVIDIA GPUDirect Storage](https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html).
