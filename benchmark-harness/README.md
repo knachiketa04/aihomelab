@@ -11,7 +11,8 @@ The harness was built to support a personal AI-infrastructure storage lab; it's 
 ## Status
 
 - **v0**: fio runner end-to-end. Validated against a known-good baseline (see [Validation](#validation) below).
-- **v0.1** (planned): MLPerf Storage / dlio_benchmark runner.
+- **Possible future direction** (no commitment): an MLPerf Storage / dlio_benchmark runner.
+- **Current state (2026-07):** dormant between campaigns; CI keeps it green. Recreate the local venv with `uv sync --extra dev`.
 
 ## Architecture
 
@@ -188,7 +189,7 @@ The harness encodes four guards learned the hard way. Each is documented at the 
 
 ## Validation
 
-The reference scenario `scenarios/fio/nvme-baseline-8job.yaml` is a faithful port of a manually-built 8-job NVMe benchmark suite. Running it through the harness against the same hardware that produced the original baseline reproduced the multi-thread sequential read ceiling within **0.05%** (10,507 MB/s vs 10,512 MB/s ground truth), and the central finding — post-SLC sustained write rate is ~13% of spec — within 3%. Latency-floor and random-write metrics show typical run-to-run variance (~10-15%); all numbers are physically grounded (no `⚠ wraps` annotations).
+The reference scenario `scenarios/fio/nvme-baseline-8job.yaml` is a faithful port of a manually-built 8-job NVMe benchmark suite. Running it through the harness against the same hardware that produced the original baseline reproduced the multi-thread sequential read ceiling within **0.05%** (10,507 MB/s vs 10,512 MB/s ground truth), and the central finding — post-SLC sustained write rate is ~13% of spec — within 3%. Latency-floor and random-write metrics vary more run-to-run (~10-15% on random-write bandwidth; the QD1 p99 latency floor differed by up to ~75% between runs); all numbers are physically grounded (no `⚠ wraps` annotations).
 
 ## Adding a new scenario
 

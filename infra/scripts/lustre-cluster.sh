@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # AIHomeLab Lustre cluster orchestrator.
 #
-# Laptop-side driver for the two-node Spark Lustre cluster documented in
-# .agent-notes/lustre/commands.md. Replaces the manual Phase 1-5 walkthrough
+# Laptop-side driver for the two-node Spark Lustre cluster.
+# Replaces the lab's manual Phase 1-5 walkthrough
 # with a single command, while preserving the same canonical sequence.
 #
 # Cluster shape (hardcoded — this script is specific to this lab):
@@ -430,7 +430,7 @@ render() {
 run_remote() {
   # run_remote <node_ssh> <rendered_script>
   local node="$1" script="$2"
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$node" "bash -s" <<<"$script" 2>&1 | relay
+  relay < <(ssh -o BatchMode=yes -o ConnectTimeout=10 "$node" "bash -s" <<<"$script" 2>&1)
 }
 
 verify_lnet_ping() {
@@ -489,8 +489,8 @@ do_bringup() {
   local pid2=$!
   wait "$pid1" || true
   wait "$pid2" || true
-  echo "[spark01]"; cat "$n1_log" | relay
-  echo "[spark02]"; cat "$n2_log" | relay
+  echo "[spark01]"; relay < "$n1_log"
+  echo "[spark02]"; relay < "$n2_log"
   rm -f "$n1_log" "$n2_log"
 
   if [[ "$WORST_STATUS" -ge 2 ]]; then
@@ -542,8 +542,8 @@ do_bringup() {
   local p1=$!
   wait "$p0" || true
   wait "$p1" || true
-  echo "[spark01]"; cat "$o0_log" | relay
-  echo "[spark02]"; cat "$o1_log" | relay
+  echo "[spark01]"; relay < "$o0_log"
+  echo "[spark02]"; relay < "$o1_log"
   rm -f "$o0_log" "$o1_log"
   [[ "$WORST_STATUS" -ge 2 ]] && { echo; echo "RED at Phase 4c/4d; halting."; return 2; }
 
@@ -565,8 +565,8 @@ do_bringup() {
   local cp2=$!
   wait "$cp1" || true
   wait "$cp2" || true
-  echo "[spark01]"; cat "$c1_log" | relay
-  echo "[spark02]"; cat "$c2_log" | relay
+  echo "[spark01]"; relay < "$c1_log"
+  echo "[spark02]"; relay < "$c2_log"
   rm -f "$c1_log" "$c2_log"
 
   echo
@@ -594,8 +594,8 @@ do_teardown() {
   ( ssh -o BatchMode=yes "$NODE2_SSH" "bash -s" <<<"$t1_n2" 2>&1 ) > "$l2" &
   local p2=$!
   wait "$p1" || true; wait "$p2" || true
-  echo "[spark01]"; cat "$l1" | relay
-  echo "[spark02]"; cat "$l2" | relay
+  echo "[spark01]"; relay < "$l1"
+  echo "[spark02]"; relay < "$l2"
   rm -f "$l1" "$l2"
 
   echo

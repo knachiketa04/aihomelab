@@ -64,7 +64,7 @@ free -h
 docker ps
 ```
 
-Note: [environment/cluster-env.md](cluster-env.md) currently records that `nvcc` is not installed on the host. That may be acceptable if the required CUDA tooling is available inside the NeMo container, but the playbook lists it as a host prerequisite, so capture the actual result before running the first experiment.
+Note: [environment/cluster-env.md](cluster-env.md) currently records that `nvcc` is not installed on the host. That may be acceptable if the required CUDA tooling is available inside the NeMo container, but the playbook lists it as a host prerequisite. In practice the container-bundled CUDA toolchain proved sufficient across all of the lab's experiments; host nvcc was never needed.
 
 ## Readiness Script
 

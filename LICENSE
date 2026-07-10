@@ -24,11 +24,10 @@ Human-readable summary:
 
   https://creativecommons.org/licenses/by/4.0/
 
-If and when source code is added to this repository (for example under
-`infra/` or `benchmarks/`), it will be licensed separately under the
-Apache License, Version 2.0, and a `LICENSE-CODE` file will be added at
-that time. Until then, this repository is documentation-only and CC-BY-4.0
-governs all content.
+Source code in this repository (the infra scripts, the benchmark-harness
+module, and the reproduce kits under artifacts/) is licensed separately under
+the Apache License, Version 2.0; see the LICENSE-CODE file. CC-BY-4.0 governs
+the documentation and all other written content.
 
 Attribution requirement (summary): if you share or adapt this material,
 you must give appropriate credit, link to the license, and indicate if

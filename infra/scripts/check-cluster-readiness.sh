@@ -278,8 +278,7 @@ probe_node() {
     return
   fi
 
-  ssh -o BatchMode=yes -o ConnectTimeout=8 "$node_ssh" "bash -s" <<<"$script" 2>&1 \
-    | relay_remote_probes
+  relay_remote_probes < <(ssh -o BatchMode=yes -o ConnectTimeout=8 "$node_ssh" "bash -s" <<<"$script" 2>&1)
 }
 
 # ─── --install-sudoers subcommand ──────────────────────────────────────────

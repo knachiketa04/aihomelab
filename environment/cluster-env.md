@@ -24,7 +24,7 @@ flowchart TB
         direction TB
         G1["GB10 GPU<br/>UMA · driver 580.142 · CUDA 13.0"]:::compute
         D1["Docker 29.2.1<br/>+ NVIDIA Container Toolkit 1.19.0"]:::container
-        N1["Local NVMe (hot)<br/>3.7 TB · 64 GB used"]:::nvme
+        N1["Local NVMe (hot)<br/>3.7 TB"]:::nvme
         G1 --- D1
         D1 -- "read / write" --- N1
       end
@@ -33,7 +33,7 @@ flowchart TB
         direction TB
         G2["GB10 GPU<br/>UMA · driver 580.142 · CUDA 13.0"]:::compute
         D2["Docker 29.2.1<br/>+ NVIDIA Container Toolkit 1.19.0"]:::container
-        N2["Local NVMe (hot)<br/>3.7 TB · 44 GB used"]:::nvme
+        N2["Local NVMe (hot)<br/>3.7 TB"]:::nvme
         G2 --- D2
         D2 -- "read / write" --- N2
       end
@@ -44,10 +44,10 @@ flowchart TB
 
     %% same-side links first so dagre routes them cleanly
     S1 <-- "control" --> MGMT
-    S2 <== "data path (planned)" ==> QSFP
+    S2 <== "data path (active)" ==> QSFP
     %% cross-side links second
     S2 <-- "control" --> MGMT
-    S1 <== "data path (planned)" ==> QSFP
+    S1 <== "data path (active)" ==> QSFP
 
     style NODES fill:transparent,stroke:transparent
 
@@ -56,7 +56,7 @@ flowchart TB
     linkStyle 0,1,2,3 stroke:#94A3B8,stroke-width:1.5px
     %% 4,6: control plane (management LAN) — cyan, dashed (lighter weight signaling)
     linkStyle 4,6 stroke:#38BDF8,stroke-width:2px,stroke-dasharray:6 4
-    %% 5,7: data plane (QSFP RoCE, planned) — amber, solid and thicker (high-bandwidth path)
+    %% 5,7: data plane (QSFP RoCE, active) — amber, solid and thicker (high-bandwidth path)
     linkStyle 5,7 stroke:#F59E0B,stroke-width:3px
 ```
 
@@ -96,7 +96,7 @@ To re-render after editing: `npx -y @mermaid-js/mermaid-cli -i <input.mmd> -o cl
 - Interface: `enp1s0f0np0` (Up on both nodes)
 - Node 1 IP: `169.254.188.115/16`
 - Node 2 IP: `169.254.10.122/16`
-- Cross-node latency: **~1.7ms avg, 0% packet loss** (verified)
+- Cross-node latency: **~1.7ms avg, 0% packet loss** (setup-day measurement; the diagram carries the later per-fabric RTTs: ~1.2 ms management LAN, ~0.8 ms QSFP)
 
 ### Full interface listing (Node 1)
 
@@ -150,7 +150,7 @@ roceP2p1s0f1  port 1 ==> enP2p1s0f1np1 (Down)
 - `nvcc` (CUDA toolkit): **not installed on host** — not needed; CUDA is bundled inside the vLLM Docker image
 
 ### Docker
-- Version: **29.1.3**
+- Version: **29.2.1** (verified 2026-05-25 via the readiness probe; an earlier setup-day note said 29.1.3)
 - No `sudo` required (sparks user is in the `docker` group)
 - NVIDIA Container Toolkit: **1.19.0** — GPU passthrough to containers confirmed available
 

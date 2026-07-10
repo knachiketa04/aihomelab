@@ -22,7 +22,7 @@ language:
 
 A small LoRA adapter that fine-tunes `Qwen/Qwen3-8B` for vegan and vegetarian recipe Q&A. It was built as the fine-tune stage of an end-to-end LLM pipeline run on workstation hardware, where the real subject was the storage behavior at each stage, not the recipes.
 
-> **Status:** Draft. Companion to the [Vegetarian & Vegan Recipe Q&A dataset](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa) and the methodology article *[What I learned building an LLM pipeline on a workstation](https://github.com/knachiketa04/aihomelab/tree/main/artifacts/concepts/llm-pipeline-on-a-workstation)*.
+> **Status:** Published; live on Hugging Face since 2026-06-07. Companion to the [Vegetarian & Vegan Recipe Q&A dataset](https://huggingface.co/datasets/knachiketa004/vegan-vegetarian-recipes-qa) and the methodology article *[What I learned building an LLM pipeline on a workstation](https://github.com/knachiketa04/aihomelab/tree/main/artifacts/concepts/llm-pipeline-on-a-workstation)*.
 
 ## The honest summary first
 

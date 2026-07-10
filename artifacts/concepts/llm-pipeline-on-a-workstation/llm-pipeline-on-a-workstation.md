@@ -431,6 +431,6 @@ Everything here is measured on two UMA workstations (Grace-class GB10), ARM64 Li
 
 **Companion reading:**
 
-- The economics of generating this dataset (cost across personal hardware, rented GPUs, and APIs) travels as a separate companion piece.
+- The economics of generating this dataset (cost across personal hardware, rented GPUs, and APIs) may follow as a future companion piece.
 
 **Foundations:** Kwon et al., [*Efficient Memory Management for LLM Serving with PagedAttention*](https://arxiv.org/abs/2309.06180) (the vLLM paper); the [MLPerf Storage benchmark](https://mlcommons.org/benchmarks/storage/); [NVIDIA GPUDirect Storage](https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html).
